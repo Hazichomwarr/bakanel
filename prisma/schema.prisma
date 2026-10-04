@@ -5,3 +5,316 @@ generator client {
 datasource db {
   provider = "postgresql"
 }
+
+enum Locale {
+  FR
+  EN
+  PT
+}
+
+enum CatalogueStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum SessionStatus {
+  DRAFT
+  OPEN
+  CLOSED
+  COMPLETED
+  CANCELLED
+}
+
+enum DeliveryMode {
+  IN_PERSON
+  ONLINE
+}
+
+enum PricingMode {
+  FIXED
+  ON_REQUEST
+}
+
+enum ExpertStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum EngagementType {
+  TRAINING
+  CONSULTING
+  STUDY
+  AUDIT
+  ISO_SUPPORT
+}
+
+enum EngagementStatus {
+  DRAFT
+  COMPLETED
+}
+
+enum EngagementVisibility {
+  PUBLIC
+  PRIVATE
+}
+
+enum ArticleStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum AdminStatus {
+  ACTIVE
+  INACTIVE
+}
+
+model TrainingDomain {
+  id           String                      @id @default(uuid()) @db.Uuid
+  status       CatalogueStatus             @default(DRAFT)
+  displayOrder Int                         @default(0)
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+  translations TrainingDomainTranslation[]
+  topics       TrainingTopic[]
+
+  @@index([status, displayOrder])
+}
+
+model TrainingDomainTranslation {
+  id               String         @id @default(uuid()) @db.Uuid
+  trainingDomainId String         @db.Uuid
+  locale           Locale
+  name             String
+  slug             String
+  /// Public visibility also requires the parent domain to be PUBLISHED; this flag alone never exposes a DRAFT or ARCHIVED parent.
+  isPublished      Boolean        @default(false)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  trainingDomain   TrainingDomain @relation(fields: [trainingDomainId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingDomainId, locale])
+  @@unique([locale, slug])
+  @@index([locale, isPublished])
+}
+
+model TrainingTopic {
+  id               String                     @id @default(uuid()) @db.Uuid
+  trainingDomainId String                     @db.Uuid
+  status           CatalogueStatus            @default(DRAFT)
+  displayOrder     Int                        @default(0)
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+  trainingDomain   TrainingDomain             @relation(fields: [trainingDomainId], references: [id], onDelete: Restrict)
+  translations     TrainingTopicTranslation[]
+  trainings        Training[]
+
+  @@index([trainingDomainId, status, displayOrder])
+}
+
+model TrainingTopicTranslation {
+  id              String        @id @default(uuid()) @db.Uuid
+  trainingTopicId String        @db.Uuid
+  locale          Locale
+  name            String
+  slug            String
+  /// Public visibility also requires the parent topic to be PUBLISHED; this flag alone never exposes a DRAFT or ARCHIVED parent.
+  isPublished     Boolean       @default(false)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  trainingTopic   TrainingTopic @relation(fields: [trainingTopicId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingTopicId, locale])
+  @@unique([locale, slug])
+  @@index([locale, isPublished])
+}
+
+model Training {
+  id              String                @id @default(uuid()) @db.Uuid
+  trainingTopicId String                @db.Uuid
+  status          CatalogueStatus       @default(DRAFT)
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
+  trainingTopic   TrainingTopic         @relation(fields: [trainingTopicId], references: [id], onDelete: Restrict)
+  translations    TrainingTranslation[]
+  sessions        TrainingSession[]
+
+  @@index([trainingTopicId, status])
+}
+
+model TrainingTranslation {
+  id             String   @id @default(uuid()) @db.Uuid
+  trainingId     String   @db.Uuid
+  locale         Locale
+  slug           String
+  title          String
+  summary        String?
+  description    String?
+  objectives     String?
+  targetAudience String?
+  program        String?
+  /// Public visibility also requires the parent training to be PUBLISHED; this flag alone never exposes a DRAFT or ARCHIVED parent.
+  isPublished    Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  training       Training @relation(fields: [trainingId], references: [id], onDelete: Cascade)
+
+  @@unique([trainingId, locale])
+  @@unique([locale, slug])
+  @@index([locale, isPublished])
+}
+
+model TrainingSession {
+  id                   String                  @id @default(uuid()) @db.Uuid
+  trainingId           String                  @db.Uuid
+  status               SessionStatus           @default(DRAFT)
+  startDate            DateTime                @db.Date
+  /// Future domain services enforce endDate >= startDate and a registration deadline coherent with the session start date.
+  endDate              DateTime                @db.Date
+  registrationDeadline DateTime?               @db.Date
+  deliveryMode         DeliveryMode
+  /// When present, ISO 3166-1 alpha-2 country code (for example BF, AO, TD, CI), never a translated country name; validate in domain services.
+  country              String?
+  city                 String?
+  venue                String?
+  pricingMode          PricingMode
+  price                Decimal?                @db.Decimal(18, 2)
+  /// When present, canonical ISO 4217 code. Store West African CFA franc as XOF; UI presentation renders it as CFA.
+  currency             String?                 @db.VarChar(3)
+  capacity             Int?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  training             Training                @relation(fields: [trainingId], references: [id], onDelete: Restrict)
+  expertAssignments    TrainingSessionExpert[]
+
+  @@index([trainingId, status, startDate])
+}
+
+model TrainingSessionExpert {
+  id                String          @id @default(uuid()) @db.Uuid
+  trainingSessionId String          @db.Uuid
+  expertId          String          @db.Uuid
+  createdAt         DateTime        @default(now())
+  trainingSession   TrainingSession @relation(fields: [trainingSessionId], references: [id], onDelete: Restrict)
+  expert            Expert          @relation(fields: [expertId], references: [id], onDelete: Restrict)
+
+  @@unique([trainingSessionId, expertId])
+  @@index([expertId])
+}
+
+model Expert {
+  id                 String                  @id @default(uuid()) @db.Uuid
+  name               String
+  status             ExpertStatus            @default(ACTIVE)
+  portraitReference  String?
+  displayOrder       Int                     @default(0)
+  createdAt          DateTime                @default(now())
+  updatedAt          DateTime                @updatedAt
+  translations       ExpertTranslation[]
+  sessionAssignments TrainingSessionExpert[]
+
+  @@index([status, displayOrder])
+}
+
+model ExpertTranslation {
+  id                String   @id @default(uuid()) @db.Uuid
+  expertId          String   @db.Uuid
+  locale            Locale
+  professionalTitle String?
+  specialization    String?
+  biography         String?
+  isPublished       Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  expert            Expert   @relation(fields: [expertId], references: [id], onDelete: Cascade)
+
+  @@unique([expertId, locale])
+  @@index([locale, isPublished])
+}
+
+model ClientOrganization {
+  id            String             @id @default(uuid()) @db.Uuid
+  name          String
+  logoReference String?
+  /// When present, ISO 3166-1 alpha-2 country code (for example BF, AO, TD, CI), never a translated country name; validate in domain services.
+  country       String?
+  isActive      Boolean            @default(true)
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  engagements   ClientEngagement[]
+
+  @@index([isActive])
+}
+
+model ClientEngagement {
+  id                   String                        @id @default(uuid()) @db.Uuid
+  clientOrganizationId String                        @db.Uuid
+  type                 EngagementType
+  status               EngagementStatus              @default(DRAFT)
+  visibility           EngagementVisibility          @default(PRIVATE)
+  startDate            DateTime?                     @db.Date
+  endDate              DateTime?                     @db.Date
+  createdAt            DateTime                      @default(now())
+  updatedAt            DateTime                      @updatedAt
+  clientOrganization   ClientOrganization            @relation(fields: [clientOrganizationId], references: [id], onDelete: Restrict)
+  translations         ClientEngagementTranslation[]
+
+  @@index([clientOrganizationId, status, visibility])
+}
+
+model ClientEngagementTranslation {
+  id                 String           @id @default(uuid()) @db.Uuid
+  clientEngagementId String           @db.Uuid
+  locale             Locale
+  title              String
+  description        String?
+  isPublished        Boolean          @default(false)
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  clientEngagement   ClientEngagement @relation(fields: [clientEngagementId], references: [id], onDelete: Cascade)
+
+  @@unique([clientEngagementId, locale])
+  @@index([locale, isPublished])
+}
+
+model Article {
+  id             String               @id @default(uuid()) @db.Uuid
+  status         ArticleStatus        @default(DRAFT)
+  coverReference String?
+  publishedAt    DateTime?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  translations   ArticleTranslation[]
+
+  @@index([status, publishedAt])
+}
+
+model ArticleTranslation {
+  id          String   @id @default(uuid()) @db.Uuid
+  articleId   String   @db.Uuid
+  locale      Locale
+  slug        String
+  title       String
+  excerpt     String?
+  content     String?
+  /// Public visibility also requires the parent article to be PUBLISHED; this flag alone never exposes a DRAFT or ARCHIVED parent.
+  isPublished Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  article     Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, locale])
+  @@unique([locale, slug])
+  @@index([locale, isPublished])
+}
+
+model AdminUser {
+  id           String      @id @default(uuid()) @db.Uuid
+  email        String      @unique
+  passwordHash String
+  name         String
+  status       AdminStatus @default(ACTIVE)
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+}
