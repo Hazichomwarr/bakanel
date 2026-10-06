@@ -1,0 +1,3 @@
+export const clientWorkErrorCodes = ["CLIENT_ORGANIZATION_NOT_FOUND", "INVALID_CLIENT_ORGANIZATION", "STALE_CLIENT_ORGANIZATION_STATE", "CLIENT_ENGAGEMENT_NOT_FOUND", "INVALID_CLIENT_ENGAGEMENT", "INVALID_ENGAGEMENT_DATES", "INVALID_ENGAGEMENT_TRANSITION", "ENGAGEMENT_IMMUTABLE", "ENGAGEMENT_TRANSLATION_NOT_FOUND", "INVALID_ENGAGEMENT_TRANSLATION", "STALE_CLIENT_ENGAGEMENT_STATE"] as const;
+export type ClientWorkErrorCode = (typeof clientWorkErrorCodes)[number];
+export class ClientWorkDomainError extends Error { constructor(readonly code: ClientWorkErrorCode, message: string) { super(message); this.name = "ClientWorkDomainError"; } }
