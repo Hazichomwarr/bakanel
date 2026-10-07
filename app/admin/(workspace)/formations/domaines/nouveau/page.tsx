@@ -1,0 +1,6 @@
+import { requireAdmin } from "@/lib/auth/current-admin";
+import { createDomainAction } from "@/lib/admin/catalogue.actions";
+import { CatalogueHeader } from "../../components";
+import { CatalogueForm } from "../../catalogue-form";
+
+export default async function NewDomainPage() { await requireAdmin(); return <div className="max-w-3xl"><CatalogueHeader title="Nouveau domaine" description="Créez une classification durable pour l’expertise de formation de W’BAKENEL." /><div className="mt-10"><CatalogueForm action={createDomainAction}><input type="hidden" name="locale" value="FR" /><fieldset className="space-y-5"><legend className="wb-mono text-xs tracking-[0.16em] text-[#245b49]">IDENTITÉ — FRANÇAIS</legend><label className="flex flex-col gap-2 text-sm font-medium">Nom<input name="name" required className="min-h-11 border border-[#a8aaa1] bg-[#fbfaf7] px-3 font-normal" /></label><label className="flex flex-col gap-2 text-sm font-medium">Slug<input name="slug" required className="min-h-11 border border-[#a8aaa1] bg-[#fbfaf7] px-3 font-normal" /></label><label className="flex flex-col gap-2 text-sm font-medium">Ordre d’affichage<input name="displayOrder" type="number" defaultValue="0" className="min-h-11 border border-[#a8aaa1] bg-[#fbfaf7] px-3 font-normal" /></label></fieldset></CatalogueForm></div></div>; }

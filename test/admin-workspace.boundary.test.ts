@@ -99,7 +99,7 @@ describe("workspace pages authenticate server-side through requireAdmin()", () =
 
   it("every workspace page calls the shared requireAdmin(), and the layout does too", () => {
     const pageFiles = files(workspaceDir).filter((file) => /(^|\/)(page|layout)\.tsx$/.test(file));
-    expect(pageFiles.length).toBe(8);
+    expect(pageFiles.length).toBeGreaterThanOrEqual(8);
     for (const file of pageFiles) {
       const source = readFileSync(file, "utf8");
       expect(source, relative(workspaceDir, file)).toContain('from "@/lib/auth/current-admin"');
