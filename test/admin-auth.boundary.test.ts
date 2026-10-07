@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
+import { createElement } from "react";
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAdminAuthStore } from "./support/admin-auth-store";
@@ -26,8 +27,7 @@ vi.mock("next/navigation", () => ({
 import { changePasswordAction, loginAction, logoutAction } from "../app/admin/auth-actions";
 import { INVALID_LOGIN_MESSAGE, PASSWORD_CHANGED_PATH, THROTTLED_MESSAGE, UNAVAILABLE_MESSAGE } from "../app/admin/auth-messages";
 import AdminLoginPage from "../app/admin/login/page";
-import AdminHomePage from "../app/admin/page";
-import AdminPasswordPage from "../app/admin/password/page";
+import AdminWorkspaceLayout from "../app/admin/(workspace)/layout";
 import { config as proxyConfig, proxy } from "../proxy";
 import { ACCOUNT_ATTEMPT_LIMIT, adminAuthService, CLIENT_ATTEMPT_LIMIT } from "../lib/auth/admin-auth.service";
 import { sessionCookieName } from "../lib/auth/cookie";
@@ -39,7 +39,7 @@ const COOKIE = sessionCookieName();
 const form = (fields: Record<string, string>) => { const data = new FormData(); for (const [key, value] of Object.entries(fields)) data.set(key, value); return data; };
 const redirectOf = async (promise: Promise<unknown>) => promise.then(() => undefined, (error: any) => { if (!error.redirectTo) throw error; return error.redirectTo as string; });
 const cookieValue = () => h.jar.get(COOKIE)?.value;
-const textOf = (node: any): string => (node == null || typeof node === "boolean" ? "" : typeof node !== "object" ? String(node) : Array.isArray(node) ? node.map(textOf).join("") : textOf(node.props?.children));
+const protectedWorkspace = () => AdminWorkspaceLayout({ children: createElement("p", undefined, "Contenu protégé") } as never);
 
 beforeEach(async () => {
   h.fake = createAdminAuthStore();
@@ -56,7 +56,7 @@ async function signIn() {
 describe("proxy (optimistic early redirect)", () => {
   const request = (path: string, cookie?: string) => new NextRequest(`https://bakanel.test${path}`, { headers: cookie ? { cookie: `${COOKIE}=${cookie}` } : {} });
 
-  it.each(["/admin", "/admin/password", "/admin/anything/deeper", "/admin/login-elsewhere"])("redirects %s to login without a session cookie", path => {
+  it.each(["/admin", "/admin/compte", "/admin/anything/deeper", "/admin/login-elsewhere"])("redirects %s to login without a session cookie", path => {
     const response = proxy(request(path));
     expect(response.status).toBe(307);
     expect(response.headers.get("location")).toBe("https://bakanel.test/admin/login");
@@ -69,7 +69,7 @@ describe("proxy (optimistic early redirect)", () => {
   it("only checks cookie presence, which is why pages re-check authoritatively", async () => {
     expect(proxy(request("/admin", "forged-cookie-value")).headers.get("location")).toBeNull();
     h.jar.set(COOKIE, { value: "forged-cookie-value" });
-    expect(await redirectOf(AdminHomePage())).toBe("/admin/login");
+    expect(await redirectOf(protectedWorkspace())).toBe("/admin/login");
   });
 
   it("is scoped to the admin area", () => {
@@ -88,16 +88,14 @@ describe("authoritative server-side guard", () => {
     expect(await redirectOf(requireAdmin())).toBe("/admin/login");
   });
 
-  it("protects /admin and /admin/password server-side, independently of the proxy", async () => {
-    expect(await redirectOf(AdminHomePage())).toBe("/admin/login");
-    expect(await redirectOf(AdminPasswordPage())).toBe("/admin/login");
+  it("protects every workspace route server-side through its nested layout, independently of the proxy", async () => {
+    expect(await redirectOf(protectedWorkspace())).toBe("/admin/login");
   });
 
   it("admits an authenticated admin", async () => {
     await signIn();
     expect(await requireAdmin()).toMatchObject({ email: "admin@example.com" });
-    expect(textOf(await AdminHomePage())).toContain("Connecté en tant que admin@example.com");
-    await expect(AdminPasswordPage()).resolves.toBeTruthy();
+    await expect(protectedWorkspace()).resolves.toBeTruthy();
   });
 
   it("keeps the login page public, and sends authenticated admins to /admin", async () => {

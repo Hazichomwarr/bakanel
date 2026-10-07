@@ -12,7 +12,7 @@ export function AuthForm({ action, fields, submitLabel }: { action: (state: Auth
       {fields.map(field => (
         <label key={field.name} className="flex flex-col gap-1 text-sm font-medium">
           {field.label}
-          <input name={field.name} type={field.type} autoComplete={field.autoComplete} required className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-base font-normal outline-none focus:border-zinc-900" />
+          <input name={field.name} type={field.type} autoComplete={field.autoComplete} required className="rounded-md border border-zinc-300 bg-white px-3 py-2 text-base font-normal focus:border-zinc-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-emerald-700" />
         </label>
       ))}
       {state.error && <p role="alert" className="text-sm text-red-700">{state.error}</p>}
