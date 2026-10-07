@@ -310,11 +310,36 @@ model ArticleTranslation {
 }
 
 model AdminUser {
-  id           String      @id @default(uuid()) @db.Uuid
-  email        String      @unique
+  id           String         @id @default(uuid()) @db.Uuid
+  email        String         @unique
   passwordHash String
   name         String
-  status       AdminStatus @default(ACTIVE)
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
+  status       AdminStatus    @default(ACTIVE)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  sessions     AdminSession[]
+}
+
+/// Server-side, individually revocable admin authentication session. The raw token exists only in the
+/// browser cookie; only its SHA-256 digest is stored. Deleting a session never deletes the AdminUser.
+model AdminSession {
+  id          String    @id @default(uuid()) @db.Uuid
+  adminUserId String    @db.Uuid
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  createdAt   DateTime  @default(now())
+  adminUser   AdminUser @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@index([adminUserId])
+}
+
+/// Fixed-window admin login attempt counter shared by every application instance. keyHash is a SHA-256
+/// digest of a throttle scope (submitted email or client address), never the raw value.
+model AdminLoginAttempt {
+  keyHash     String
+  windowStart DateTime
+  attempts    Int      @default(0)
+
+  @@id([keyHash, windowStart])
+  @@index([windowStart])
 }
