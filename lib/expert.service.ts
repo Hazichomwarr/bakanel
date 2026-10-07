@@ -12,6 +12,11 @@ export type UpdateExpertInput = { name?: string; portraitReference?: string | nu
 export type ExpertTranslationInput = { locale: Locale; professionalTitle?: string | null; specialization?: string | null; biography?: string | null };
 
 export function createExpertService(client: PrismaClient) {
+  const normalizedProfile = (input: ExpertInput) => ({ name: normalizeExpertName(input.name), displayOrder: normalizeDisplayOrder(input.displayOrder ?? 0), portraitReference: normalizeOptionalText(input.portraitReference) });
+  const normalizedTranslation = (input: ExpertTranslationInput) => {
+    assertExpertLocale(input.locale);
+    return { professionalTitle: normalizeOptionalText(input.professionalTitle), specialization: normalizeOptionalText(input.specialization), biography: normalizeOptionalText(input.biography) };
+  };
   async function requireExpert(tx: Prisma.TransactionClient, id: string) {
     const expert = await tx.expert.findUnique({ where: { id } });
     if (!expert) fail("EXPERT_NOT_FOUND", "Expert was not found.");
@@ -28,9 +33,16 @@ export function createExpertService(client: PrismaClient) {
   }
   return {
     createExpert(input: ExpertInput) {
-      const name = normalizeExpertName(input.name);
-      const displayOrder = normalizeDisplayOrder(input.displayOrder ?? 0);
-      return client.expert.create({ data: { name, displayOrder, portraitReference: normalizeOptionalText(input.portraitReference) } });
+      return client.expert.create({ data: normalizedProfile(input) });
+    },
+    async createExpertWithTranslation(input: ExpertInput, translation: ExpertTranslationInput) {
+      const profile = normalizedProfile(input);
+      const presentation = normalizedTranslation(translation);
+      return client.$transaction(async tx => {
+        const expert = await tx.expert.create({ data: profile });
+        await tx.expertTranslation.create({ data: { expertId: expert.id, locale: translation.locale, ...presentation } });
+        return expert;
+      });
     },
     async updateExpert(id: string, input: UpdateExpertInput) {
       return client.$transaction(async tx => {
@@ -48,8 +60,7 @@ export function createExpertService(client: PrismaClient) {
     activateExpert: (id: string) => transition(id, ExpertStatus.ACTIVE),
     deactivateExpert: (id: string) => transition(id, ExpertStatus.INACTIVE),
     async upsertExpertTranslation(expertId: string, input: ExpertTranslationInput) {
-      assertExpertLocale(input.locale);
-      const data = { professionalTitle: normalizeOptionalText(input.professionalTitle), specialization: normalizeOptionalText(input.specialization), biography: normalizeOptionalText(input.biography) };
+      const data = normalizedTranslation(input);
       return client.$transaction(async tx => { await requireExpert(tx, expertId); return tx.expertTranslation.upsert({ where: { expertId_locale: { expertId, locale: input.locale } }, create: { expertId, locale: input.locale, ...data }, update: data }); });
     },
     async publishExpertTranslation(expertId: string, locale: Locale) {

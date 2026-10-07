@@ -16,6 +16,7 @@ function makeStore() {
       updateMany: async ({ where, data }: any) => { const expert = experts.get(where.id); if (!expert || expert.status !== where.status) return { count: 0 }; Object.assign(expert, data); return { count: 1 }; },
     },
     expertTranslation: {
+      create: async ({ data }: any) => { const id = key(data.expertId, data.locale); const value = { id, isPublished: false, ...data }; translations.set(id, value); return value; },
       upsert: async ({ where, create, update }: any) => { const id = key(where.expertId_locale.expertId, where.expertId_locale.locale); const existing = translations.get(id); const value = existing ? Object.assign(existing, update) : { id, isPublished: false, ...create }; translations.set(id, value); return value; },
       findUnique: async ({ where }: any) => where.id ? [...translations.values()].find(t => t.id === where.id) ?? null : translations.get(key(where.expertId_locale.expertId, where.expertId_locale.locale)) ?? null,
       updateMany: async ({ where, data }: any) => { const translation = [...translations.values()].find(t => t.id === where.id); if (!translation || translation.isPublished !== where.isPublished) return { count: 0 }; Object.assign(translation, data); return { count: 1 }; },
@@ -31,6 +32,13 @@ describe("Expert service", () => {
     expect(expert).toMatchObject({ name: "Awa Traore", portraitReference: "portrait-1", status: ExpertStatus.ACTIVE });
     const updated = await service.updateExpert(expert.id, { name: "Awa T.", displayOrder: 2, portraitReference: " " });
     expect(updated).toMatchObject({ name: "Awa T.", displayOrder: 2, portraitReference: null, status: ExpertStatus.ACTIVE });
+  });
+
+  it("creates the Expert and initial presentation atomically", async () => {
+    const fake = makeStore(); const service = createExpertService(fake.store as PrismaClient);
+    const expert = await service.createExpertWithTranslation({ name: "Awa" }, { locale: Locale.FR, professionalTitle: "Formatrice" });
+    expect(fake.experts.get(expert.id)).toMatchObject({ name: "Awa" });
+    expect(fake.translations.get(fake.key(expert.id, Locale.FR))).toMatchObject({ professionalTitle: "Formatrice" });
   });
 
   it("deactivates and reactivates without changing translations or historical assignments", async () => {
