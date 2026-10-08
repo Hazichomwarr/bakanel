@@ -19,6 +19,52 @@ export function createClientWorkService(client: PrismaClient, today = () => new 
     async deactivateClientOrganization(id: string) { return client.$transaction(async tx => { const current = await org(tx, id); if (!current.isActive) fail("STALE_CLIENT_ORGANIZATION_STATE", "Organization is already inactive."); const r = await tx.clientOrganization.updateMany({ where: { id, isActive: true }, data: { isActive: false } }); if (!r.count) fail("STALE_CLIENT_ORGANIZATION_STATE", "Organization changed concurrently."); return org(tx, id); }); },
     async activateClientOrganization(id: string) { return client.$transaction(async tx => { const current = await org(tx, id); if (current.isActive) fail("STALE_CLIENT_ORGANIZATION_STATE", "Organization is already active."); const r = await tx.clientOrganization.updateMany({ where: { id, isActive: false }, data: { isActive: true } }); if (!r.count) fail("STALE_CLIENT_ORGANIZATION_STATE", "Organization changed concurrently."); return org(tx, id); }); },
     async createClientEngagement(input: EngagementInput) { assertEngagementType(input.type); const dates = normalizeEngagementDates(input.startDate ?? null, input.endDate ?? null); return client.$transaction(async tx => { await org(tx, input.clientOrganizationId); return tx.clientEngagement.create({ data: { clientOrganizationId: input.clientOrganizationId, type: input.type, ...dates } }); }); },
+    async createClientEngagementWithTranslation(
+      input: EngagementInput,
+      translation: {
+        locale: Locale;
+        title: string;
+        description?: string | null;
+      },
+    ) {
+      assertEngagementType(input.type);
+      assertLocale(translation.locale);
+
+      const dates = normalizeEngagementDates(
+        input.startDate ?? null,
+        input.endDate ?? null,
+      );
+      const translationData = {
+        title: translation.title.trim(),
+        description: normalizeOptionalText(translation.description),
+      };
+
+      if (!translationData.title) {
+        fail("INVALID_ENGAGEMENT_TRANSLATION", "Translation title is required.");
+      }
+
+      return client.$transaction(async (transaction) => {
+        await org(transaction, input.clientOrganizationId);
+
+        const engagement = await transaction.clientEngagement.create({
+          data: {
+            clientOrganizationId: input.clientOrganizationId,
+            type: input.type,
+            ...dates,
+          },
+        });
+
+        await transaction.clientEngagementTranslation.create({
+          data: {
+            clientEngagementId: engagement.id,
+            locale: translation.locale,
+            ...translationData,
+          },
+        });
+
+        return engagement;
+      });
+    },
     async updateClientEngagement(id: string, input: EngagementUpdate) { return client.$transaction(async tx => { const current = await engagement(tx, id); if (current.status === EngagementStatus.COMPLETED && (input.clientOrganizationId !== undefined || input.type !== undefined || input.startDate !== undefined || input.endDate !== undefined)) fail("ENGAGEMENT_IMMUTABLE", "Completed engagement facts are immutable."); const dates = normalizeEngagementDates(input.startDate === undefined ? current.startDate : input.startDate, input.endDate === undefined ? current.endDate : input.endDate); if (input.clientOrganizationId) await org(tx, input.clientOrganizationId); const r = await tx.clientEngagement.updateMany({ where: { id, status: current.status }, data: { clientOrganizationId: input.clientOrganizationId ?? current.clientOrganizationId, type: input.type ?? current.type, ...dates } }); if (!r.count) fail("STALE_CLIENT_ENGAGEMENT_STATE", "Engagement changed concurrently."); return engagement(tx, id); }); },
     async completeClientEngagement(id: string) { return client.$transaction(async tx => { const current = await engagement(tx, id); if (current.status !== EngagementStatus.DRAFT) fail("INVALID_ENGAGEMENT_TRANSITION", "Only draft engagements may be completed."); const dates = normalizeEngagementDates(current.startDate, current.endDate); if (!dates.startDate || !dates.endDate || dates.endDate > today()) fail("INVALID_ENGAGEMENT_TRANSITION", "Completion requires concluded dates."); const r = await tx.clientEngagement.updateMany({ where: { id, status: EngagementStatus.DRAFT }, data: { status: EngagementStatus.COMPLETED } }); if (!r.count) fail("STALE_CLIENT_ENGAGEMENT_STATE", "Engagement changed concurrently."); return engagement(tx, id); }); },
     async makeClientEngagementPublic(id: string) { return setVisibility(id, EngagementVisibility.PUBLIC); },
