@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "format:check": "prettier --check AGENTS.md docs/engineering-standards.md package.json prettier.config.mjs eslint.config.mjs tsconfig.json",
+    "format": "prettier --write AGENTS.md docs/engineering-standards.md package.json prettier.config.mjs eslint.config.mjs tsconfig.json",
     "admin:create": "tsx --conditions=react-server scripts/create-admin.ts"
   },
   "dependencies": {
@@ -30,6 +32,7 @@
     "@types/ws": "^8.18.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "prettier": "^3.6.2",
     "prisma": "7.10.0",
     "tailwindcss": "^4",
     "tsx": "^4.23.15",

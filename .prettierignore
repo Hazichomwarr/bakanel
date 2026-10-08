@@ -1,0 +1,9 @@
+node_modules/
+.next/
+build/
+coverage/
+out/
+prisma/generated/
+public/generated/
+*.min.*
+pnpm-lock.yaml
