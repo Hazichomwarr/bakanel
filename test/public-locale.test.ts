@@ -2,7 +2,22 @@ import { Locale } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 
 import { dictionaries } from "../lib/public/content";
-import { isPublicLocale, publicHref, publicLocales, toPrismaLocale } from "../lib/public/locale";
+import {
+  publicArticleWhere,
+  publicDomainWhere,
+  publicExpertWhere,
+  publicReferenceWhere,
+  publicSessionWhere,
+  publicTopicWhere,
+  publicTrainingWhere,
+} from "../lib/public/eligibility";
+import {
+  isPublicLocale,
+  publicHref,
+  publicLocales,
+  toPrismaLocale,
+  type PublicLocale,
+} from "../lib/public/locale";
 
 describe("public locale foundation", () => {
   it.each(["fr", "en", "pt"])("accepts enabled locale %s", (locale) => {
@@ -19,6 +34,27 @@ describe("public locale foundation", () => {
     expect(toPrismaLocale("en")).toBe(Locale.EN);
     expect(toPrismaLocale("pt")).toBe(Locale.PT);
     expect(publicLocales.map(publicHref)).toEqual(["/fr", "/en", "/pt"]);
+  });
+
+  it("rejects an unvalidated runtime locale instead of dropping the locale filter", () => {
+    expect(() => toPrismaLocale("de" as PublicLocale)).toThrow("Unsupported public locale.");
+    expect(() => toPrismaLocale("constructor" as PublicLocale)).toThrow(
+      "Unsupported public locale.",
+    );
+  });
+
+  it.each([
+    ["domain", (locale: PublicLocale) => publicDomainWhere(locale)],
+    ["topic", (locale: PublicLocale) => publicTopicWhere(locale)],
+    ["training", (locale: PublicLocale) => publicTrainingWhere(locale)],
+    ["session", (locale: PublicLocale) => publicSessionWhere(locale, new Date())],
+    ["expert", (locale: PublicLocale) => publicExpertWhere(locale)],
+    ["reference", (locale: PublicLocale) => publicReferenceWhere(locale)],
+    ["article", (locale: PublicLocale) => publicArticleWhere(locale)],
+  ])("refuses to build a %s publication predicate for an unsupported locale", (_name, build) => {
+    for (const unsupported of ["de", "FR", "", "constructor", "__proto__"]) {
+      expect(() => build(unsupported as PublicLocale)).toThrow("Unsupported public locale.");
+    }
   });
 
   it("provides complete locale-specific shell copy without a fallback", () => {

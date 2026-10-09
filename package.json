@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.mts",
     "format:check": "prettier --check AGENTS.md docs/engineering-standards.md package.json prettier.config.mjs eslint.config.mjs tsconfig.json",
     "format": "prettier --write AGENTS.md docs/engineering-standards.md package.json prettier.config.mjs eslint.config.mjs tsconfig.json",
     "admin:create": "tsx --conditions=react-server scripts/create-admin.ts"
@@ -25,13 +26,16 @@
     "ws": "^8.22.0"
   },
   "devDependencies": {
+    "@prisma/adapter-pg": "7.10.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
+    "@types/pg": "^8.23.1",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@types/ws": "^8.18.2",
     "eslint": "^9",
     "eslint-config-next": "16.3.6",
+    "pg": "^8.23.1",
     "prettier": "^3.6.2",
     "prisma": "7.10.0",
     "tailwindcss": "^4",
