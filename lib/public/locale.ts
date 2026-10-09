@@ -1,9 +1,9 @@
 import { Locale } from "@prisma/client";
-export const publicLocales = ["fr", "en", "pt"] as const;
-export type PublicLocale = (typeof publicLocales)[number];
-export function isPublicLocale(value: string): value is PublicLocale {
-  return publicLocales.includes(value as PublicLocale);
-}
+
+import { isPublicLocale, type PublicLocale } from "./locale-codes";
+
+export { isPublicLocale, publicLocales, type PublicLocale } from "./locale-codes";
+
 export function toPrismaLocale(locale: PublicLocale): Locale {
   switch (locale) {
     case "fr":
@@ -19,4 +19,21 @@ export function toPrismaLocale(locale: PublicLocale): Locale {
 }
 export function publicHref(locale: PublicLocale) {
   return `/${locale}`;
+}
+
+/**
+ * Returns the same page in another locale. Route segments below the locale are shared, so only
+ * the leading locale segment changes; anything outside the public locale tree falls back to the
+ * target locale's homepage.
+ */
+export function localizedPathname(pathname: string, target: PublicLocale) {
+  const [, firstSegment, ...rest] = pathname.split("/");
+
+  if (!firstSegment || !isPublicLocale(firstSegment)) {
+    return publicHref(target);
+  }
+
+  const remainder = rest.filter((segment) => segment.length > 0).join("/");
+
+  return remainder ? `${publicHref(target)}/${remainder}` : publicHref(target);
 }

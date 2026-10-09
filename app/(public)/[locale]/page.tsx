@@ -1,33 +1,59 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { isPublicLocale } from "@/lib/public/locale";
+import { HomeComplementaryServices } from "./_components/home-complementary-services";
+import { HomeContactCta } from "./_components/home-contact-cta";
+import { HomeHero } from "./_components/home-hero";
+import { HomeIntroduction } from "./_components/home-introduction";
+import { HomeTrainingDomains } from "./_components/home-training-domains";
+import { HomeTrainingPreview } from "./_components/home-training-preview";
 import { dictionaries } from "@/lib/public/content";
+import { getHomepageTrainingPreview } from "@/lib/public/homepage";
+import { isPublicLocale } from "@/lib/public/locale";
 
-export default async function PublicLocalePlaceholder({
-  params,
-}: {
+export const dynamic = "force-dynamic";
+
+type PublicHomepageProps = {
   params: Promise<{ locale: string }>;
-}) {
+};
+
+export async function generateMetadata({ params }: PublicHomepageProps): Promise<Metadata> {
   const { locale } = await params;
-  if (!isPublicLocale(locale)) notFound();
+
+  if (!isPublicLocale(locale)) {
+    return {};
+  }
+
   const dictionary = dictionaries[locale];
 
+  return {
+    title: "W'BAKENEL Consulting Institute",
+    description: dictionary.home.heroDescription,
+  };
+}
+
+export default async function PublicHomepage({ params }: PublicHomepageProps) {
+  const { locale } = await params;
+
+  if (!isPublicLocale(locale)) {
+    notFound();
+  }
+
+  const dictionary = dictionaries[locale];
+  const trainingPreview = await getHomepageTrainingPreview(locale);
+
   return (
-    <section className="mx-auto flex min-h-[65vh] max-w-6xl items-center px-5 py-20">
-      <div className="max-w-3xl border-l border-[var(--wb-green)] pl-6">
-        <p className="wb-mono text-xs tracking-[.18em] text-[var(--wb-green)]">
-          W&apos;BAKENEL CONSULTING INSTITUTE
-        </p>
-        <h1 className="mt-6 text-5xl font-semibold md:text-7xl">W&apos;BAKENEL</h1>
-        <p className="mt-6 text-xl text-[var(--wb-muted)]">{dictionary.descriptor}</p>
-        <p className="mt-3 text-[var(--wb-muted)]">{dictionary.preparing}</p>
-        <a
-          href="https://wa.me/22651513197"
-          className="mt-8 inline-flex bg-[var(--wb-green-deep)] px-5 py-3 text-white"
-        >
-          {dictionary.contact}
-        </a>
-      </div>
-    </section>
+    <>
+      <HomeHero dictionary={dictionary.home} />
+      <HomeTrainingDomains
+        locale={locale}
+        dictionary={dictionary.home}
+        domains={dictionary.trainingDomains}
+      />
+      <HomeTrainingPreview dictionary={dictionary.home} preview={trainingPreview} />
+      <HomeIntroduction dictionary={dictionary.home} />
+      <HomeComplementaryServices locale={locale} dictionary={dictionary} />
+      <HomeContactCta dictionary={dictionary.home} />
+    </>
   );
 }

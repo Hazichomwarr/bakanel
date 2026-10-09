@@ -1,9 +1,24 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import type { PublicDictionary } from "@/lib/public/content";
 import type { PublicLocale } from "@/lib/public/locale";
-import { publicHref, publicLocales } from "@/lib/public/locale";
+import { localizedPathname, publicHref, publicLocales } from "@/lib/public/locale";
+import { servicesHref } from "@/lib/public/services";
+function servicesAriaCurrent(pathname: string, servicesPath: string, inServices: boolean) {
+  if (pathname === servicesPath) {
+    return "page";
+  }
+
+  if (inServices) {
+    return "true";
+  }
+
+  return undefined;
+}
+
 export function PublicShell({
   locale,
   dictionary,
@@ -14,6 +29,10 @@ export function PublicShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const pathname = usePathname() ?? publicHref(locale);
+  const servicesPath = servicesHref(locale);
+  const inServices = pathname === servicesPath || pathname.startsWith(`${servicesPath}/`);
+  const servicesCurrent = servicesAriaCurrent(pathname, servicesPath, inServices);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -55,26 +74,36 @@ export function PublicShell({
           <Link href={publicHref(locale)} className="wb-mono text-lg font-semibold">
             W&apos;BAKENEL
           </Link>
-          <nav className="hidden items-center gap-4 md:flex" aria-label="Public navigation">
+          <nav className="hidden items-center gap-4 md:flex" aria-label={dictionary.navigation}>
+            <Link
+              href={servicesPath}
+              aria-current={servicesCurrent}
+              className={`wb-focus mr-2 text-sm font-medium ${inServices ? "underline underline-offset-4" : ""}`}
+            >
+              {dictionary.servicesNav}
+            </Link>
             {publicLocales.map((item) => (
               <Link
                 key={item}
-                href={publicHref(item)}
+                href={localizedPathname(pathname, item)}
+                hrefLang={item}
+                lang={item}
                 aria-current={item === locale ? "page" : undefined}
+                className="wb-focus text-sm"
               >
                 {item.toUpperCase()}
               </Link>
             ))}
             <a
-              href="https://wa.me/22651513197"
-              className="border border-[var(--wb-green-deep)] px-3 py-2"
+              href={WHATSAPP_CONTACT_URL}
+              className="wb-focus border border-[var(--wb-green-deep)] px-3 py-2 text-sm"
             >
               {dictionary.contact}
             </a>
           </nav>
           <button
             ref={trigger}
-            className="md:hidden"
+            className="wb-focus min-h-10 px-2 text-sm md:hidden"
             aria-expanded={open}
             onClick={() => setOpen(true)}
           >
@@ -98,13 +127,31 @@ export function PublicShell({
             >
               {dictionary.closeMenu}
             </button>
-            <nav className="mt-8 flex flex-col gap-5">
+            <nav className="mt-8 flex flex-col gap-5" aria-label={dictionary.navigation}>
+              <Link
+                href={servicesPath}
+                aria-current={servicesCurrent}
+                className="wb-focus min-h-10 text-lg font-medium"
+                onClick={() => setOpen(false)}
+              >
+                {dictionary.servicesNav}
+              </Link>
               {publicLocales.map((item) => (
-                <Link key={item} href={publicHref(item)} onClick={() => setOpen(false)}>
+                <Link
+                  key={item}
+                  href={localizedPathname(pathname, item)}
+                  hrefLang={item}
+                  lang={item}
+                  aria-current={item === locale ? "page" : undefined}
+                  className="wb-focus"
+                  onClick={() => setOpen(false)}
+                >
                   {item.toUpperCase()}
                 </Link>
               ))}
-              <a href="https://wa.me/22651513197">{dictionary.contact}</a>
+              <a className="wb-focus" href={WHATSAPP_CONTACT_URL}>
+                {dictionary.contact}
+              </a>
             </nav>
           </aside>
         </div>
@@ -113,7 +160,9 @@ export function PublicShell({
       <footer className="bg-[var(--wb-green-deep)] text-white">
         <div className="mx-auto flex max-w-6xl flex-wrap justify-between gap-4 px-5 py-8 text-sm">
           <span>W&apos;BAKENEL · {dictionary.descriptor}</span>
-          <a href="https://wa.me/22651513197">WhatsApp +226 51 51 31 97</a>
+          <a className="wb-focus" href={WHATSAPP_CONTACT_URL}>
+            WhatsApp +226 51 51 31 97
+          </a>
         </div>
       </footer>
     </>

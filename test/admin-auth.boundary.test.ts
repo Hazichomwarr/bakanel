@@ -72,8 +72,15 @@ describe("proxy (optimistic early redirect)", () => {
     expect(await redirectOf(protectedWorkspace())).toBe("/admin/login");
   });
 
-  it("is scoped to the admin area", () => {
-    expect(proxyConfig.matcher).toEqual(["/admin", "/admin/:path*"]);
+  it("covers the whole admin area plus only the public locale guard entries", () => {
+    expect(proxyConfig.matcher).toEqual([
+      "/admin",
+      "/admin/:path*",
+      "/:locale([a-zA-Z]{2})",
+      "/:locale([a-zA-Z]{2})/:path*",
+      "/:locale([a-zA-Z]{2}[-_][a-zA-Z]{2})",
+      "/:locale([a-zA-Z]{2}[-_][a-zA-Z]{2})/:path*",
+    ]);
   });
 });
 

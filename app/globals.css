@@ -26,9 +26,98 @@ body {
   font-family: var(--font-geist-sans), Arial, Helvetica, sans-serif;
 }
 
-.wb-workspace { background: var(--wb-canvas); color: var(--wb-ink); }
-.wb-mono { font-family: var(--font-geist-mono), ui-monospace, monospace; }
-.wb-rule { border-color: var(--wb-rule); }
-.wb-focus:focus-visible { outline: 2px solid var(--wb-green); outline-offset: 3px; }
-.wb-action { color: var(--wb-green); }
-.wb-action:hover { color: var(--wb-green-deep); }
+.wb-workspace {
+  background: var(--wb-canvas);
+  color: var(--wb-ink);
+}
+
+.wb-mono {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+}
+
+.wb-editorial {
+  font-family: Georgia, "Times New Roman", serif;
+  letter-spacing: -0.035em;
+}
+
+.wb-kicker {
+  color: var(--wb-green);
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.16em;
+}
+
+.wb-rule {
+  border-color: var(--wb-rule);
+}
+
+.wb-focus:focus-visible {
+  outline: 2px solid var(--wb-green);
+  outline-offset: 3px;
+}
+
+.wb-action {
+  color: var(--wb-green);
+}
+
+.wb-action:hover {
+  color: var(--wb-green-deep);
+}
+
+.wb-button-light,
+.wb-button-dark,
+.wb-button-quiet,
+.wb-text-link {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.875rem;
+  font-weight: 600;
+  min-height: 3rem;
+  padding: 0.75rem 1.25rem;
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease;
+}
+
+.wb-button-light {
+  background: var(--wb-paper);
+  color: var(--wb-green-deep);
+}
+
+.wb-button-light:hover {
+  background: #e6eee5;
+}
+
+.wb-button-dark {
+  background: var(--wb-green-deep);
+  color: white;
+}
+
+.wb-button-dark:hover {
+  background: var(--wb-green);
+}
+
+.wb-button-quiet {
+  border: 1px solid rgba(255, 255, 255, 0.65);
+  color: white;
+}
+
+.wb-button-quiet:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.wb-text-link {
+  border-bottom: 1px solid currentColor;
+  color: var(--wb-green-deep);
+  padding-inline: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
