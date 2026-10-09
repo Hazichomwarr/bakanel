@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import type { PublicDictionary } from "@/lib/public/content";
@@ -107,6 +107,62 @@ function LanguageSelector({
   );
 }
 
+function SearchAwareLanguageSelector({
+  locale,
+  dictionary,
+  pathname,
+  hash,
+}: {
+  locale: PublicLocale;
+  dictionary: PublicDictionary;
+  pathname: string;
+  hash: string;
+}) {
+  const search = useSearchParams().toString();
+
+  return (
+    <LanguageSelector
+      locale={locale}
+      dictionary={dictionary}
+      languageHref={(target) => localizedPublicHref(pathname, target, search, hash)}
+    />
+  );
+}
+
+// useSearchParams() bails out of static prerendering up to the nearest Suspense boundary.
+// Keeping that boundary around the selector alone lets the rest of every public page
+// prerender; the fallback is the same selector without the request query string.
+function PublicLanguageSelector({
+  locale,
+  dictionary,
+  pathname,
+  hash,
+}: {
+  locale: PublicLocale;
+  dictionary: PublicDictionary;
+  pathname: string;
+  hash: string;
+}) {
+  const fallback = (
+    <LanguageSelector
+      locale={locale}
+      dictionary={dictionary}
+      languageHref={(target) => localizedPublicHref(pathname, target, "", hash)}
+    />
+  );
+
+  return (
+    <Suspense fallback={fallback}>
+      <SearchAwareLanguageSelector
+        locale={locale}
+        dictionary={dictionary}
+        pathname={pathname}
+        hash={hash}
+      />
+    </Suspense>
+  );
+}
+
 export function PublicShell({
   locale,
   dictionary,
@@ -119,15 +175,12 @@ export function PublicShell({
   const [open, setOpen] = useState(false);
   const [hash, setHash] = useState("");
   const pathname = usePathname() ?? publicHref(locale);
-  const searchParams = useSearchParams();
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   const servicesPath = servicesHref(locale);
   const inServices = pathname === servicesPath || pathname.startsWith(`${servicesPath}/`);
   const servicesCurrent = servicesAriaCurrent(pathname, servicesPath, inServices);
   const homePath = publicHref(locale);
-  const search = searchParams.toString();
-  const searchSuffix = search ? `?${search}` : "";
 
   useEffect(() => {
     const updateHash = () => setHash(window.location.hash);
@@ -177,8 +230,6 @@ export function PublicShell({
     return () => document.removeEventListener("keydown", key);
   }, [open]);
 
-  const languageHref = (target: PublicLocale) =>
-    localizedPublicHref(pathname, target, searchSuffix, hash);
   const navigationItems: NavigationItem[] = [
     {
       href: homePath,
@@ -205,7 +256,12 @@ export function PublicShell({
           </Link>
 
           <div className="flex items-center gap-1 md:hidden">
-            <LanguageSelector locale={locale} dictionary={dictionary} languageHref={languageHref} />
+            <PublicLanguageSelector
+              locale={locale}
+              dictionary={dictionary}
+              pathname={pathname}
+              hash={hash}
+            />
             <button
               ref={trigger}
               type="button"
@@ -231,7 +287,12 @@ export function PublicShell({
                 {item.label}
               </Link>
             ))}
-            <LanguageSelector locale={locale} dictionary={dictionary} languageHref={languageHref} />
+            <PublicLanguageSelector
+              locale={locale}
+              dictionary={dictionary}
+              pathname={pathname}
+              hash={hash}
+            />
             <a
               href={WHATSAPP_CONTACT_URL}
               className="wb-focus ml-1 min-h-10 border border-[var(--wb-green-deep)] px-3 py-2 text-sm font-medium"
