@@ -116,7 +116,11 @@ export type PublicDictionary = {
   preparing: string;
   notFound: string;
   error: string;
+  homeNav: string;
+  trainingsNav: string;
+  aboutNav: string;
   servicesNav: string;
+  languageSelector: string;
   home: HomeDictionary;
   trainingDomains: TrainingDomainsDictionary;
   services: ServicesDictionary;

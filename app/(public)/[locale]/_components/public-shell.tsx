@@ -1,12 +1,21 @@
 "use client";
+
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import type { PublicDictionary } from "@/lib/public/content";
 import type { PublicLocale } from "@/lib/public/locale";
-import { localizedPathname, publicHref, publicLocales } from "@/lib/public/locale";
+import { localizedPublicHref, publicHref, publicLocales } from "@/lib/public/locale";
 import { servicesHref } from "@/lib/public/services";
+
+type NavigationItem = {
+  href: string;
+  label: string;
+  current?: "page" | "true";
+};
+
 function servicesAriaCurrent(pathname: string, servicesPath: string, inServices: boolean) {
   if (pathname === servicesPath) {
     return "page";
@@ -19,6 +28,85 @@ function servicesAriaCurrent(pathname: string, servicesPath: string, inServices:
   return undefined;
 }
 
+function LanguageSelector({
+  locale,
+  dictionary,
+  languageHref,
+}: {
+  locale: PublicLocale;
+  dictionary: PublicDictionary;
+  languageHref: (target: PublicLocale) => string;
+}) {
+  const [open, setOpen] = useState(false);
+  const selector = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    const dismiss = (event: MouseEvent) => {
+      if (!selector.current?.contains(event.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setOpen(false);
+        trigger.current?.focus();
+      }
+    };
+
+    document.addEventListener("mousedown", dismiss);
+    document.addEventListener("keydown", onKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", dismiss);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={selector} className="relative">
+      <button
+        ref={trigger}
+        type="button"
+        aria-expanded={open}
+        aria-haspopup="true"
+        aria-label={`${dictionary.languageSelector}: ${locale.toUpperCase()}`}
+        className="wb-focus inline-flex min-h-10 items-center gap-1 px-2 text-sm font-medium"
+        onClick={() => setOpen((isOpen) => !isOpen)}
+      >
+        <span>{locale.toUpperCase()}</span>
+        <span aria-hidden="true" className="text-xs">
+          ▾
+        </span>
+      </button>
+      {open ? (
+        <nav
+          aria-label={dictionary.languageSelector}
+          className="absolute right-0 z-50 mt-2 min-w-24 border border-[var(--wb-rule)] bg-[var(--wb-paper)] p-1 shadow-[0_12px_28px_rgba(24,33,29,0.16)]"
+        >
+          {publicLocales.map((item) => (
+            <Link
+              key={item}
+              href={languageHref(item)}
+              hrefLang={item}
+              lang={item}
+              aria-current={item === locale ? "page" : undefined}
+              className="wb-focus flex min-h-10 items-center px-3 text-sm hover:bg-[var(--wb-green-soft)]"
+              onClick={() => setOpen(false)}
+            >
+              {item.toUpperCase()}
+            </Link>
+          ))}
+        </nav>
+      ) : null}
+    </div>
+  );
+}
+
 export function PublicShell({
   locale,
   dictionary,
@@ -29,14 +117,36 @@ export function PublicShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [hash, setHash] = useState("");
   const pathname = usePathname() ?? publicHref(locale);
+  const searchParams = useSearchParams();
+  const trigger = useRef<HTMLButtonElement>(null);
+  const panel = useRef<HTMLElement>(null);
   const servicesPath = servicesHref(locale);
   const inServices = pathname === servicesPath || pathname.startsWith(`${servicesPath}/`);
   const servicesCurrent = servicesAriaCurrent(pathname, servicesPath, inServices);
-  const trigger = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLElement>(null);
+  const homePath = publicHref(locale);
+  const search = searchParams.toString();
+  const searchSuffix = search ? `?${search}` : "";
+
   useEffect(() => {
-    if (!open) return;
+    const updateHash = () => setHash(window.location.hash);
+
+    updateHash();
+    window.addEventListener("hashchange", updateHash);
+    window.addEventListener("popstate", updateHash);
+
+    return () => {
+      window.removeEventListener("hashchange", updateHash);
+      window.removeEventListener("popstate", updateHash);
+    };
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
     const first = panel.current?.querySelector<HTMLElement>("a,button");
     first?.focus();
     const key = (event: KeyboardEvent) => {
@@ -45,6 +155,7 @@ export function PublicShell({
         trigger.current?.focus();
         return;
       }
+
       if (event.key === "Tab" && panel.current) {
         const focusable = [
           ...panel.current.querySelectorAll<HTMLElement>("a[href], button:not([disabled])"),
@@ -61,65 +172,88 @@ export function PublicShell({
         }
       }
     };
+
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);
   }, [open]);
+
+  const languageHref = (target: PublicLocale) =>
+    localizedPublicHref(pathname, target, searchSuffix, hash);
+  const navigationItems: NavigationItem[] = [
+    {
+      href: homePath,
+      label: dictionary.homeNav,
+      current: pathname === homePath ? "page" : undefined,
+    },
+    { href: `${homePath}#formations-publiees`, label: dictionary.trainingsNav },
+    { href: `${homePath}#a-propos`, label: dictionary.aboutNav },
+    { href: servicesPath, label: dictionary.servicesNav, current: servicesCurrent },
+  ];
+
   return (
     <>
       <a href="#public-content" className="sr-only focus:not-sr-only">
         {dictionary.skipToContent}
       </a>
       <header className="border-b border-[var(--wb-rule)] bg-[var(--wb-paper)]">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-5 py-5">
-          <Link href={publicHref(locale)} className="wb-mono text-lg font-semibold">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:px-5">
+          <Link
+            href={homePath}
+            className="wb-focus wb-mono shrink-0 text-base font-semibold tracking-tight sm:text-lg"
+          >
             W&apos;BAKENEL
           </Link>
-          <nav className="hidden items-center gap-4 md:flex" aria-label={dictionary.navigation}>
-            <Link
-              href={servicesPath}
-              aria-current={servicesCurrent}
-              className={`wb-focus mr-2 text-sm font-medium ${inServices ? "underline underline-offset-4" : ""}`}
+
+          <div className="flex items-center gap-1 md:hidden">
+            <LanguageSelector locale={locale} dictionary={dictionary} languageHref={languageHref} />
+            <button
+              ref={trigger}
+              type="button"
+              className="wb-focus min-h-10 px-2 text-sm font-medium"
+              aria-expanded={open}
+              aria-controls="public-mobile-navigation"
+              onClick={() => setOpen(true)}
             >
-              {dictionary.servicesNav}
-            </Link>
-            {publicLocales.map((item) => (
+              {dictionary.menu}
+            </button>
+          </div>
+
+          <nav className="hidden items-center gap-1 md:flex" aria-label={dictionary.navigation}>
+            {navigationItems.map((item) => (
               <Link
-                key={item}
-                href={localizedPathname(pathname, item)}
-                hrefLang={item}
-                lang={item}
-                aria-current={item === locale ? "page" : undefined}
-                className="wb-focus text-sm"
+                key={item.href}
+                href={item.href}
+                aria-current={item.current}
+                className={`wb-focus min-h-10 px-2 text-sm font-medium ${
+                  item.current ? "underline underline-offset-4" : ""
+                }`}
               >
-                {item.toUpperCase()}
+                {item.label}
               </Link>
             ))}
+            <LanguageSelector locale={locale} dictionary={dictionary} languageHref={languageHref} />
             <a
               href={WHATSAPP_CONTACT_URL}
-              className="wb-focus border border-[var(--wb-green-deep)] px-3 py-2 text-sm"
+              className="wb-focus ml-1 min-h-10 border border-[var(--wb-green-deep)] px-3 py-2 text-sm font-medium"
             >
               {dictionary.contact}
             </a>
           </nav>
-          <button
-            ref={trigger}
-            className="wb-focus min-h-10 px-2 text-sm md:hidden"
-            aria-expanded={open}
-            onClick={() => setOpen(true)}
-          >
-            {dictionary.menu}
-          </button>
         </div>
       </header>
       {open ? (
         <div className="fixed inset-0 z-50 bg-black/30">
           <aside
+            id="public-mobile-navigation"
             ref={panel}
             role="dialog"
             aria-modal="true"
-            className="ml-auto h-full w-72 bg-[var(--wb-paper)] p-6"
+            aria-label={dictionary.navigation}
+            className="ml-auto h-full w-72 max-w-[calc(100%-2rem)] bg-[var(--wb-paper)] p-6"
           >
             <button
+              type="button"
+              className="wb-focus min-h-10 text-sm font-medium"
               onClick={() => {
                 setOpen(false);
                 trigger.current?.focus();
@@ -127,29 +261,19 @@ export function PublicShell({
             >
               {dictionary.closeMenu}
             </button>
-            <nav className="mt-8 flex flex-col gap-5" aria-label={dictionary.navigation}>
-              <Link
-                href={servicesPath}
-                aria-current={servicesCurrent}
-                className="wb-focus min-h-10 text-lg font-medium"
-                onClick={() => setOpen(false)}
-              >
-                {dictionary.servicesNav}
-              </Link>
-              {publicLocales.map((item) => (
+            <nav className="mt-8 flex flex-col gap-3" aria-label={dictionary.navigation}>
+              {navigationItems.map((item) => (
                 <Link
-                  key={item}
-                  href={localizedPathname(pathname, item)}
-                  hrefLang={item}
-                  lang={item}
-                  aria-current={item === locale ? "page" : undefined}
-                  className="wb-focus"
+                  key={item.href}
+                  href={item.href}
+                  aria-current={item.current}
+                  className="wb-focus min-h-10 text-lg font-medium"
                   onClick={() => setOpen(false)}
                 >
-                  {item.toUpperCase()}
+                  {item.label}
                 </Link>
               ))}
-              <a className="wb-focus" href={WHATSAPP_CONTACT_URL}>
+              <a className="wb-focus mt-4 min-h-10 text-lg font-medium" href={WHATSAPP_CONTACT_URL}>
                 {dictionary.contact}
               </a>
             </nav>

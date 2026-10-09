@@ -37,3 +37,16 @@ export function localizedPathname(pathname: string, target: PublicLocale) {
 
   return remainder ? `${publicHref(target)}/${remainder}` : publicHref(target);
 }
+
+/** Preserve an in-app query string and hash when switching to the corresponding locale route. */
+export function localizedPublicHref(
+  pathname: string,
+  target: PublicLocale,
+  search = "",
+  hash = "",
+) {
+  const query = search ? (search.startsWith("?") ? search : `?${search}`) : "";
+  const fragment = hash ? (hash.startsWith("#") ? hash : `#${hash}`) : "";
+
+  return `${localizedPathname(pathname, target)}${query}${fragment}`;
+}

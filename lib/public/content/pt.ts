@@ -12,7 +12,11 @@ export const pt: PublicDictionary = {
   preparing: "O nosso site institucional está a ser preparado.",
   notFound: "Página não encontrada",
   error: "Ocorreu um erro",
+  homeNav: "Início",
+  trainingsNav: "Formações",
+  aboutNav: "Sobre nós",
   servicesNav: "Serviços",
+  languageSelector: "Escolher idioma",
   home: {
     eyebrow: "W'BAKENEL CONSULTING INSTITUTE",
     heroTitle: "Formar as competências que fazem avançar as organizações.",

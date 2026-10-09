@@ -12,7 +12,11 @@ export const en: PublicDictionary = {
   preparing: "Our institutional website is being prepared.",
   notFound: "Page not found",
   error: "Something went wrong",
+  homeNav: "Home",
+  trainingsNav: "Training",
+  aboutNav: "About",
   servicesNav: "Services",
+  languageSelector: "Choose language",
   home: {
     eyebrow: "W'BAKENEL CONSULTING INSTITUTE",
     heroTitle: "Building the skills that move organisations forward.",

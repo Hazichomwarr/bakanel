@@ -4,7 +4,7 @@ import type { HomeDictionary } from "@/lib/public/content";
 
 export function HomeIntroduction({ dictionary }: { dictionary: HomeDictionary }) {
   return (
-    <section className="mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:py-32 xl:px-0">
+    <section id="a-propos" className="mx-auto max-w-7xl px-5 py-24 sm:px-8 lg:py-32 xl:px-0">
       <div className="grid items-center gap-12 lg:grid-cols-[0.9fr_1.1fr] lg:gap-20">
         <div className="relative aspect-[1.2] overflow-hidden bg-[var(--wb-green-soft)]">
           <Image

@@ -8,7 +8,12 @@ import { HomeComplementaryServices } from "../app/(public)/[locale]/_components/
 import * as serviceDetailRoute from "../app/(public)/[locale]/services/[service]/page";
 import * as servicesOverviewRoute from "../app/(public)/[locale]/services/page";
 import { dictionaries } from "../lib/public/content";
-import { localizedPathname, publicLocales, type PublicLocale } from "../lib/public/locale";
+import {
+  localizedPathname,
+  localizedPublicHref,
+  publicLocales,
+  type PublicLocale,
+} from "../lib/public/locale";
 import {
   complementaryServiceSlugs,
   getServiceContent,
@@ -144,6 +149,15 @@ describe("service navigation URLs", () => {
     expect(localizedPathname("/fr/", "en")).toBe("/en");
   });
 
+  it("preserves the current route query and section when switching languages", () => {
+    expect(localizedPublicHref("/fr/services", "pt", "view=all", "#overview")).toBe(
+      "/pt/services?view=all#overview",
+    );
+    expect(localizedPublicHref("/en", "fr", "", "#formations-publiees")).toBe(
+      "/fr#formations-publiees",
+    );
+  });
+
   it("falls back to the target homepage outside the public locale tree", () => {
     expect(localizedPathname("/admin/login", "en")).toBe("/en");
     expect(localizedPathname("/", "pt")).toBe("/pt");
@@ -163,6 +177,10 @@ describe("service dictionaries", () => {
 
       expect(Object.keys(services.items).sort()).toEqual([...serviceSlugs].sort());
       expect(dictionaries[locale].servicesNav.trim()).not.toBe("");
+      expect(dictionaries[locale].homeNav.trim()).not.toBe("");
+      expect(dictionaries[locale].trainingsNav.trim()).not.toBe("");
+      expect(dictionaries[locale].aboutNav.trim()).not.toBe("");
+      expect(dictionaries[locale].languageSelector.trim()).not.toBe("");
       expect(allServiceCopy(locale).every((copy) => copy.trim().length > 0)).toBe(true);
     }
   });

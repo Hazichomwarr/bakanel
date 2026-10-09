@@ -21,7 +21,7 @@ export function HomeComplementaryServices({
   const home = dictionary.home;
 
   return (
-    <section className="bg-[var(--wb-paper)] py-24 lg:py-32">
+    <section id="services" className="bg-[var(--wb-paper)] py-24 lg:py-32">
       <div className="mx-auto max-w-7xl px-5 sm:px-8 xl:px-0">
         <div className="max-w-3xl">
           <p className="wb-kicker">{home.complementaryEyebrow}</p>
