@@ -19,6 +19,7 @@ import TrainingDetailPage, {
 } from "../app/(public)/[locale]/formations/[slug]/page";
 import { WHATSAPP_CONTACT_URL } from "../lib/public/contact";
 import { dictionaries } from "../lib/public/content";
+import { publicLocales } from "../lib/public/locale";
 import {
   formatPublicDate,
   formatPublicDateRange,
@@ -239,6 +240,15 @@ describe("public programme detail route", () => {
 
 describe("public session presentation", () => {
   const copy = dictionaries.fr.trainingDetail;
+
+  it("does not imply an independent session-publication state in any locale", () => {
+    for (const locale of publicLocales) {
+      const detail = dictionaries[locale].trainingDetail;
+
+      expect(detail.sessionsDescription).not.toMatch(/publiée|published|publicadas/i);
+      expect(detail.sessionsEmpty).not.toMatch(/publiée|published|publicadas/i);
+    }
+  });
 
   it("formats date-only values in UTC without a timezone day shift", () => {
     const startDate = new Date("2026-11-02T00:00:00.000Z");

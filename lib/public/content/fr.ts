@@ -59,8 +59,8 @@ export const fr: PublicDictionary = {
     unavailableDescription: "Veuillez réessayer plus tard ou contacter notre équipe sur WhatsApp.",
     sessionsEyebrow: "SESSIONS À VENIR",
     sessionsTitle: "Prochaines sessions",
-    sessionsDescription: "Consultez les sessions publiées pour cette formation.",
-    sessionsEmpty: "Aucune session à venir n'est publiée pour cette formation pour le moment.",
+    sessionsDescription: "Consultez les prochaines sessions associées à cette formation.",
+    sessionsEmpty: "Aucune prochaine session n'est actuellement affichée pour cette formation.",
     sessionsUnavailable:
       "Les sessions sont momentanément indisponibles. Veuillez réessayer plus tard.",
     datesLabel: "Dates",
