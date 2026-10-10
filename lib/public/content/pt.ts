@@ -76,6 +76,10 @@ export const pt: PublicDictionary = {
     registrationOpen: "Informações disponíveis",
     registrationClosed: "Informações encerradas",
     sessionEnquiryLabel: "Pedir informações sobre esta sessão",
+    futureSessionsTitle: "Quer conhecer as próximas sessões?",
+    futureSessionsDescription:
+      "Contacte a W'BAKENEL para saber mais sobre futuras oportunidades de formação.",
+    futureSessionsCta: "Pedir informações sobre próximas sessões",
     contactEyebrow: "VAMOS CONVERSAR",
     contactTitle: "Tem alguma questão sobre este programa?",
     contactDescription:

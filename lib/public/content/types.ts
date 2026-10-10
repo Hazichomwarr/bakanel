@@ -97,6 +97,9 @@ export type TrainingDetailDictionary = {
   registrationOpen: string;
   registrationClosed: string;
   sessionEnquiryLabel: string;
+  futureSessionsTitle: string;
+  futureSessionsDescription: string;
+  futureSessionsCta: string;
   contactEyebrow: string;
   contactTitle: string;
   contactDescription: string;

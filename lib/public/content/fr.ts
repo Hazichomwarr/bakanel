@@ -76,6 +76,10 @@ export const fr: PublicDictionary = {
     registrationOpen: "Renseignements ouverts",
     registrationClosed: "Renseignements clos",
     sessionEnquiryLabel: "Se renseigner sur cette session",
+    futureSessionsTitle: "Vous souhaitez connaître les prochaines sessions ?",
+    futureSessionsDescription:
+      "Contactez W'BAKENEL pour vous renseigner sur les prochaines dates de formation.",
+    futureSessionsCta: "Se renseigner sur les prochaines sessions",
     contactEyebrow: "ÉCHANGEONS",
     contactTitle: "Une question sur ce programme ?",
     contactDescription: "Notre équipe vous répond sur WhatsApp pour échanger sur vos besoins.",

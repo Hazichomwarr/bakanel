@@ -254,20 +254,27 @@ export default async function TrainingDetailPage({ params }: TrainingDetailPageP
                         }
                       />
                     </dl>
-                    <a
-                      className="wb-focus wb-text-link mt-8 inline-flex"
-                      href={WHATSAPP_CONTACT_URL}
-                      aria-label={`${detail.sessionEnquiryLabel}: ${formatPublicDateRange(locale, session.startDate, session.endDate)}`}
-                    >
-                      {detail.sessionEnquiryLabel}
-                      <span aria-hidden="true" className="ml-2">
-                        →
-                      </span>
-                    </a>
+                    {session.registrationOpen ? (
+                      <a
+                        className="wb-focus wb-text-link mt-8 inline-flex"
+                        href={WHATSAPP_CONTACT_URL}
+                        aria-label={`${detail.sessionEnquiryLabel}: ${formatPublicDateRange(locale, session.startDate, session.endDate)}`}
+                      >
+                        {detail.sessionEnquiryLabel}
+                        <span aria-hidden="true" className="ml-2">
+                          →
+                        </span>
+                      </a>
+                    ) : null}
                   </li>
                 );
               })}
             </ul>
+          ) : null}
+
+          {sessions.status === "available" &&
+          sessions.sessions.some((session) => !session.registrationOpen) ? (
+            <FutureSessionsContact locale={locale} />
           ) : null}
 
           {sessions.status === "available" && sessions.sessions.length === 0 ? (
@@ -305,6 +312,35 @@ export default async function TrainingDetailPage({ params }: TrainingDetailPageP
         </div>
       </section>
     </>
+  );
+}
+
+/**
+ * One general contact block per page, shown when at least one listed session no longer takes
+ * enquiries (CLOSED, or OPEN with an expired deadline). It links to the general WhatsApp
+ * contact and never refers to a particular session.
+ */
+function FutureSessionsContact({ locale }: { locale: PublicLocale }) {
+  const detail = dictionaries[locale].trainingDetail;
+
+  return (
+    <section
+      aria-labelledby="future-sessions-title"
+      className="mt-10 max-w-2xl border-l-2 border-[var(--wb-green)] pl-6"
+    >
+      <h3 id="future-sessions-title" className="text-xl font-medium text-[var(--wb-ink)]">
+        {detail.futureSessionsTitle}
+      </h3>
+      <p className="mt-3 text-lg leading-8 text-[var(--wb-muted)]">
+        {detail.futureSessionsDescription}
+      </p>
+      <a className="wb-focus wb-text-link mt-6 inline-flex" href={WHATSAPP_CONTACT_URL}>
+        {detail.futureSessionsCta}
+        <span aria-hidden="true" className="ml-2">
+          →
+        </span>
+      </a>
+    </section>
   );
 }
 
