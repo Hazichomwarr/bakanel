@@ -146,6 +146,14 @@ describe("public training catalogue route", () => {
       expect(metadata).toEqual({
         title: `${catalogue.metaTitle} | W'BAKENEL Consulting Institute`,
         description: catalogue.metaDescription,
+        alternates: {
+          canonical: `/${locale}/formations`,
+          languages: {
+            fr: "/fr/formations",
+            en: "/en/formations",
+            pt: "/pt/formations",
+          },
+        },
       });
       titles.add(metadata.title);
     }

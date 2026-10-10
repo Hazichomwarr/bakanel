@@ -5,8 +5,8 @@ import { notFound } from "next/navigation";
 
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import { dictionaries } from "@/lib/public/content";
-import type { PublicTrainingDetailDto } from "@/lib/public/dto";
-import { isPublicLocale, publicHref, type PublicLocale } from "@/lib/public/locale";
+import type { PublicTrainingAlternateDto, PublicTrainingDetailDto } from "@/lib/public/dto";
+import { isPublicLocale, publicLocales, type PublicLocale } from "@/lib/public/locale";
 import { publicSessionReader } from "@/lib/public/session.read";
 import {
   formatPublicDateRange,
@@ -14,6 +14,7 @@ import {
   formatPublicSessionPrice,
 } from "@/lib/public/training-presentation";
 import { publicTrainingReader } from "@/lib/public/training.read";
+import { trainingCatalogueHref, trainingDetailHref } from "@/lib/public/training-routes";
 
 type TrainingDetailPageProps = {
   params: Promise<{ locale: string; slug: string }>;
@@ -32,13 +33,9 @@ type SessionResult =
     }
   | { status: "unavailable" };
 
-function catalogueHref(locale: PublicLocale) {
-  return `${publicHref(locale)}/formations`;
-}
-
-function trainingHref(locale: PublicLocale, slug: string) {
-  return `${catalogueHref(locale)}/${encodeURIComponent(slug)}`;
-}
+type AlternateResult =
+  | { status: "available"; alternates: PublicTrainingAlternateDto[] }
+  | { status: "unavailable" };
 
 function isOperationalDatabaseError(error: unknown): error is Error {
   return (
@@ -84,6 +81,38 @@ async function getSessions(locale: PublicLocale, slug: string): Promise<SessionR
   }
 }
 
+async function getAlternates(locale: PublicLocale, slug: string): Promise<AlternateResult> {
+  try {
+    const alternates = await publicTrainingReader.listPublicTrainingAlternates(locale, slug);
+    return { status: "available", alternates };
+  } catch (error) {
+    if (!isOperationalDatabaseError(error)) {
+      throw error;
+    }
+
+    console.error(`Public training alternates unavailable (${operationalErrorLabel(error)}).`);
+    return { status: "unavailable" };
+  }
+}
+
+function trainingLocaleTargets(
+  locale: PublicLocale,
+  slug: string,
+  alternates: PublicTrainingAlternateDto[],
+) {
+  const targets = Object.fromEntries(
+    publicLocales.map((target) => [target, trainingCatalogueHref(target)]),
+  ) as Record<PublicLocale, string>;
+
+  targets[locale] = trainingDetailHref(locale, slug);
+
+  for (const alternate of alternates) {
+    targets[alternate.locale] = trainingDetailHref(alternate.locale, alternate.slug);
+  }
+
+  return targets;
+}
+
 export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: TrainingDetailPageProps): Promise<Metadata> {
@@ -100,11 +129,22 @@ export async function generateMetadata({ params }: TrainingDetailPageProps): Pro
 
   const training = result.training;
   const dictionary = dictionaries[locale].trainingDetail;
+  const alternateResult = await getAlternates(locale, training.slug);
+  const alternates = alternateResult.status === "available" ? alternateResult.alternates : [];
+  const targets = trainingLocaleTargets(locale, training.slug, alternates);
 
   return {
     title: `${training.title} | W'BAKENEL Consulting Institute`,
     description: training.summary ?? training.description ?? dictionary.metadataDescription,
-    alternates: { canonical: trainingHref(locale, training.slug) },
+    alternates: {
+      canonical: trainingDetailHref(locale, training.slug),
+      languages: Object.fromEntries(
+        Object.entries(targets).filter(
+          ([target]) =>
+            target === locale || alternates.some((alternate) => alternate.locale === target),
+        ),
+      ),
+    },
   };
 }
 
@@ -127,15 +167,21 @@ export default async function TrainingDetailPage({ params }: TrainingDetailPageP
   const training = trainingResult.training;
   const dictionary = dictionaries[locale];
   const detail = dictionary.trainingDetail;
-  const sessions = await getSessions(locale, training.slug);
+  const [sessions, alternateResult] = await Promise.all([
+    getSessions(locale, training.slug),
+    getAlternates(locale, training.slug),
+  ]);
+  const alternates = alternateResult.status === "available" ? alternateResult.alternates : [];
+  const targets = trainingLocaleTargets(locale, training.slug, alternates);
 
   return (
     <>
+      <TrainingLocaleTargets targets={targets} />
       <section className="bg-[var(--wb-green-deep)] text-white">
         <div className="mx-auto max-w-7xl px-5 pt-10 pb-20 sm:px-8 lg:pb-28 xl:px-0">
           <Link
             className="wb-focus wb-mono text-xs tracking-[0.12em] text-[#c9d8c8]"
-            href={catalogueHref(locale)}
+            href={trainingCatalogueHref(locale)}
           >
             ← {detail.backToCatalogue}
           </Link>
@@ -296,6 +342,10 @@ function UnavailableTrainingPage({ locale }: { locale: PublicLocale }) {
       </div>
     </section>
   );
+}
+
+function TrainingLocaleTargets({ targets }: { targets: Record<PublicLocale, string> }) {
+  return <span hidden data-public-training-locale-targets={JSON.stringify(targets)} />;
 }
 
 function SessionFact({ label, value }: { label: string; value: string }) {

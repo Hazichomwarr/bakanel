@@ -3,10 +3,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const getPublicTrainingBySlug = vi.hoisted(() => vi.fn());
+const listPublicTrainingAlternates = vi.hoisted(() => vi.fn());
 const listPublicUpcomingSessionsForTraining = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/public/training.read", () => ({
-  publicTrainingReader: { getPublicTrainingBySlug },
+  publicTrainingReader: { getPublicTrainingBySlug, listPublicTrainingAlternates },
 }));
 
 vi.mock("@/lib/public/session.read", () => ({
@@ -75,8 +76,10 @@ function unreachableDatabaseError() {
 
 beforeEach(() => {
   getPublicTrainingBySlug.mockReset();
+  listPublicTrainingAlternates.mockReset();
   listPublicUpcomingSessionsForTraining.mockReset();
   getPublicTrainingBySlug.mockResolvedValue(training);
+  listPublicTrainingAlternates.mockResolvedValue([]);
   listPublicUpcomingSessionsForTraining.mockResolvedValue([]);
 });
 
@@ -101,6 +104,18 @@ describe("public programme detail route", () => {
     expect(markup).toContain(training.program);
     expect(markup).not.toContain("internal-training-id");
     expect(markup).not.toContain("DRAFT");
+  });
+
+  it("uses reader-provided alternate slugs and falls back to each catalogue without guessing", async () => {
+    listPublicTrainingAlternates.mockResolvedValue([{ locale: "en", slug: "claims-management" }]);
+
+    const markup = await renderDetail();
+
+    expect(listPublicTrainingAlternates).toHaveBeenCalledWith("fr", training.slug);
+    expect(markup).toContain(
+      'data-public-training-locale-targets="{&quot;fr&quot;:&quot;/fr/formations/gestion-des-sinistres&quot;,&quot;en&quot;:&quot;/en/formations/claims-management&quot;,&quot;pt&quot;:&quot;/pt/formations&quot;}"',
+    );
+    expect(markup).not.toContain("/pt/formations/gestion-des-sinistres");
   });
 
   it("omits empty optional programme sections without inventing content", async () => {
@@ -182,13 +197,42 @@ describe("public programme detail route", () => {
     );
   });
 
-  it("uses only eligible content in localized metadata and publishes the current canonical URL", async () => {
+  it("uses only eligible alternate slugs in localized metadata", async () => {
+    listPublicTrainingAlternates.mockResolvedValue([
+      { locale: "fr", slug: "gestion-des-sinistres" },
+      { locale: "pt", slug: "gestao-de-sinistros" },
+    ]);
+
     const metadata = await generateMetadata(routeProps("en", training.slug));
 
     expect(metadata).toEqual({
       title: `${training.title} | W'BAKENEL Consulting Institute`,
       description: training.summary,
-      alternates: { canonical: `/en/formations/${training.slug}` },
+      alternates: {
+        canonical: `/en/formations/${training.slug}`,
+        languages: {
+          en: `/en/formations/${training.slug}`,
+          fr: "/fr/formations/gestion-des-sinistres",
+          pt: "/pt/formations/gestao-de-sinistros",
+        },
+      },
+    });
+  });
+
+  it("does not advertise an unavailable translation in metadata", async () => {
+    listPublicTrainingAlternates.mockResolvedValue([{ locale: "fr", slug: training.slug }]);
+
+    const metadata = await generateMetadata(routeProps("en", training.slug));
+
+    expect(metadata.alternates).toEqual({
+      canonical: `/en/formations/${training.slug}`,
+      languages: {
+        en: `/en/formations/${training.slug}`,
+        fr: `/fr/formations/${training.slug}`,
+      },
+    });
+    expect(metadata).not.toMatchObject({
+      alternates: { languages: { pt: expect.any(String) } },
     });
   });
 });

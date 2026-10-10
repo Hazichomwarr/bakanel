@@ -341,13 +341,13 @@ describe("homepage hero", () => {
   it.each(publicLocales)("uses localized training photography in %s", (locale) => {
     const home = dictionaries[locale].home;
     const markup = readableText(
-      renderToStaticMarkup(createElement(HomeHero, { dictionary: home })),
+      renderToStaticMarkup(createElement(HomeHero, { locale, dictionary: home })),
     );
 
     expect(markup).toContain(home.heroImageAlt);
     expect(markup).toContain("hero.png");
     expect(hrefs(markup)).toEqual(
-      expect.arrayContaining(["#formations", "https://wa.me/22651513197"]),
+      expect.arrayContaining([`/${locale}/formations`, "https://wa.me/22651513197"]),
     );
   });
 });

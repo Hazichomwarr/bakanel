@@ -168,10 +168,10 @@ describe("training-first positioning", () => {
   it.each(publicLocales)("leads the %s hero with training and offers contact second", (locale) => {
     const home = dictionaries[locale].home;
     const markup = readableText(
-      renderToStaticMarkup(createElement(HomeHero, { dictionary: home })),
+      renderToStaticMarkup(createElement(HomeHero, { locale, dictionary: home })),
     );
 
-    expect(hrefs(markup)).toEqual([`#${HOME_TRAINING_SECTION_ID}`, WHATSAPP_CONTACT_URL]);
+    expect(hrefs(markup)).toEqual([`/${locale}/formations`, WHATSAPP_CONTACT_URL]);
     expect(markup.indexOf(home.trainingCta)).toBeLessThan(markup.indexOf(home.heroContactCta));
   });
 

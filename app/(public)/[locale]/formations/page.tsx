@@ -6,8 +6,9 @@ import { Prisma } from "@prisma/client";
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import { dictionaries } from "@/lib/public/content";
 import type { PublicTrainingDto } from "@/lib/public/dto";
-import { isPublicLocale, publicHref, type PublicLocale } from "@/lib/public/locale";
+import { isPublicLocale, publicLocales, publicHref, type PublicLocale } from "@/lib/public/locale";
 import { publicTrainingReader } from "@/lib/public/training.read";
+import { trainingCatalogueHref, trainingDetailHref } from "@/lib/public/training-routes";
 
 const PAGE_SIZE = 12;
 const LOOKAHEAD_LIMIT = PAGE_SIZE + 1;
@@ -87,6 +88,12 @@ export async function generateMetadata({ params }: CataloguePageProps): Promise<
   return {
     title: `${catalogue.metaTitle} | W'BAKENEL Consulting Institute`,
     description: catalogue.metaDescription,
+    alternates: {
+      canonical: trainingCatalogueHref(locale),
+      languages: Object.fromEntries(
+        publicLocales.map((targetLocale) => [targetLocale, trainingCatalogueHref(targetLocale)]),
+      ),
+    },
   };
 }
 
@@ -153,7 +160,7 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
                   <div className="mt-auto flex flex-wrap gap-x-6 gap-y-4 pt-8">
                     <Link
                       className="wb-focus wb-text-link"
-                      href={`${catalogueHref(locale, 1)}/${encodeURIComponent(training.slug)}`}
+                      href={trainingDetailHref(locale, training.slug)}
                     >
                       {catalogue.detailLabel}
                       <span aria-hidden="true" className="ml-2">

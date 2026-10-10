@@ -19,7 +19,7 @@ import { PublicShell } from "../app/(public)/[locale]/_components/public-shell";
 import * as serviceDetailRoute from "../app/(public)/[locale]/services/[service]/page";
 import * as servicesOverviewRoute from "../app/(public)/[locale]/services/page";
 import { dictionaries } from "../lib/public/content";
-import { publicLocales, type PublicLocale } from "../lib/public/locale";
+import { localizedPublicHref, publicLocales, type PublicLocale } from "../lib/public/locale";
 import { getServiceContent, serviceHref, serviceSlugs, servicesHref } from "../lib/public/services";
 
 // During `next build`, useSearchParams() throws a client-side-rendering bailout on a
@@ -91,6 +91,19 @@ describe("public shell during static prerendering", () => {
     expect(markup).toContain(`aria-label="${dictionaries.fr.navigation}"`);
     expect(markup).toContain(dictionaries.fr.homeNav);
     expect(markup).toContain(dictionaries.fr.servicesNav);
+  });
+
+  it("links the header training destination to the localized catalogue overview", () => {
+    const markup = renderShell("pt", "/pt", <main>Conteúdo</main>);
+
+    expect(markup).toContain('href="/pt/formations"');
+    expect(markup).not.toContain('href="#formations"');
+  });
+
+  it("preserves the localized catalogue route, query string, and hash while switching languages", () => {
+    expect(localizedPublicHref("/fr/formations", "en", "page=2", "#programmes")).toBe(
+      "/en/formations?page=2#programmes",
+    );
   });
 
   it("reads search params only for the language selector, once per header placement", () => {

@@ -44,7 +44,7 @@ export default async function PublicHomepage({ params }: PublicHomepageProps) {
 
   return (
     <>
-      <HomeHero dictionary={dictionary.home} />
+      <HomeHero locale={locale} dictionary={dictionary.home} />
       <HomeTrainingDomains
         locale={locale}
         dictionary={dictionary.home}

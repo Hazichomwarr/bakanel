@@ -6,9 +6,15 @@ import { Suspense, useEffect, useRef, useState } from "react";
 
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import type { PublicDictionary } from "@/lib/public/content";
-import type { PublicLocale } from "@/lib/public/locale";
-import { localizedPublicHref, publicHref, publicLocales } from "@/lib/public/locale";
+import {
+  isPublicLocale,
+  localizedPublicHref,
+  publicHref,
+  publicLocales,
+  type PublicLocale,
+} from "@/lib/public/locale";
 import { servicesHref } from "@/lib/public/services";
+import { trainingCatalogueHref } from "@/lib/public/training-routes";
 
 type NavigationItem = {
   href: string;
@@ -26,6 +32,71 @@ function servicesAriaCurrent(pathname: string, servicesPath: string, inServices:
   }
 
   return undefined;
+}
+
+type TrainingLocaleTargets = Partial<Record<PublicLocale, string>>;
+
+function isTrainingDetailPath(pathname: string) {
+  const segments = pathname.split("/").filter(Boolean);
+  return (
+    segments.length === 3 &&
+    isPublicLocale(segments[0]) &&
+    segments[1] === "formations" &&
+    segments[2].length > 0
+  );
+}
+
+function readTrainingLocaleTargets(pathname: string): TrainingLocaleTargets | null {
+  if (typeof document === "undefined" || !isTrainingDetailPath(pathname)) {
+    return null;
+  }
+
+  const targetElement = document.querySelector<HTMLElement>(
+    "[data-public-training-locale-targets]",
+  );
+  const serializedTargets = targetElement?.dataset.publicTrainingLocaleTargets;
+  if (!serializedTargets) {
+    return null;
+  }
+
+  try {
+    const parsedTargets: unknown = JSON.parse(serializedTargets);
+    if (!parsedTargets || typeof parsedTargets !== "object" || Array.isArray(parsedTargets)) {
+      return null;
+    }
+
+    const targets: TrainingLocaleTargets = {};
+    for (const locale of publicLocales) {
+      const target = (parsedTargets as Record<string, unknown>)[locale];
+      const prefix = `${trainingCatalogueHref(locale)}/`;
+
+      if (typeof target === "string" && target.startsWith(prefix)) {
+        targets[locale] = target;
+      }
+    }
+
+    return targets;
+  } catch {
+    return null;
+  }
+}
+
+function selectorHref({
+  pathname,
+  target,
+  search,
+  hash,
+}: {
+  pathname: string;
+  target: PublicLocale;
+  search: string;
+  hash: string;
+}) {
+  if (isTrainingDetailPath(pathname)) {
+    return readTrainingLocaleTargets(pathname)?.[target] ?? trainingCatalogueHref(target);
+  }
+
+  return localizedPublicHref(pathname, target, search, hash);
 }
 
 function LanguageSelector({
@@ -124,7 +195,7 @@ function SearchAwareLanguageSelector({
     <LanguageSelector
       locale={locale}
       dictionary={dictionary}
-      languageHref={(target) => localizedPublicHref(pathname, target, search, hash)}
+      languageHref={(target) => selectorHref({ pathname, target, search, hash })}
     />
   );
 }
@@ -147,7 +218,14 @@ function PublicLanguageSelector({
     <LanguageSelector
       locale={locale}
       dictionary={dictionary}
-      languageHref={(target) => localizedPublicHref(pathname, target, "", hash)}
+      languageHref={(target) =>
+        selectorHref({
+          pathname,
+          target,
+          search: "",
+          hash,
+        })
+      }
     />
   );
 
@@ -181,6 +259,7 @@ export function PublicShell({
   const inServices = pathname === servicesPath || pathname.startsWith(`${servicesPath}/`);
   const servicesCurrent = servicesAriaCurrent(pathname, servicesPath, inServices);
   const homePath = publicHref(locale);
+  const trainingsPath = trainingCatalogueHref(locale);
 
   useEffect(() => {
     const updateHash = () => setHash(window.location.hash);
@@ -236,7 +315,12 @@ export function PublicShell({
       label: dictionary.homeNav,
       current: pathname === homePath ? "page" : undefined,
     },
-    { href: `${homePath}#formations-publiees`, label: dictionary.trainingsNav },
+    {
+      href: trainingsPath,
+      label: dictionary.trainingsNav,
+      current:
+        pathname === trainingsPath || pathname.startsWith(`${trainingsPath}/`) ? "page" : undefined,
+    },
     { href: `${homePath}#a-propos`, label: dictionary.aboutNav },
     { href: servicesPath, label: dictionary.servicesNav, current: servicesCurrent },
   ];

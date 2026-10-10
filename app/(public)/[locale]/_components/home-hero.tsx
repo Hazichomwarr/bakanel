@@ -1,10 +1,18 @@
 import Image from "next/image";
+import Link from "next/link";
 
-import type { HomeDictionary } from "@/lib/public/content";
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
-import { HOME_TRAINING_SECTION_ID } from "./home-training-domains";
+import type { HomeDictionary } from "@/lib/public/content";
+import type { PublicLocale } from "@/lib/public/locale";
+import { trainingCatalogueHref } from "@/lib/public/training-routes";
 
-export function HomeHero({ dictionary }: { dictionary: HomeDictionary }) {
+export function HomeHero({
+  locale,
+  dictionary,
+}: {
+  locale: PublicLocale;
+  dictionary: HomeDictionary;
+}) {
   return (
     <section className="bg-[var(--wb-green-deep)] text-white">
       <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-16 lg:px-12 lg:py-20 xl:px-16">
@@ -17,9 +25,9 @@ export function HomeHero({ dictionary }: { dictionary: HomeDictionary }) {
             {dictionary.heroDescription}
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
-            <a className="wb-focus wb-button-light" href={`#${HOME_TRAINING_SECTION_ID}`}>
+            <Link className="wb-focus wb-button-light" href={trainingCatalogueHref(locale)}>
               {dictionary.trainingCta}
-            </a>
+            </Link>
             <a className="wb-focus wb-button-quiet" href={WHATSAPP_CONTACT_URL}>
               {dictionary.heroContactCta}
             </a>
