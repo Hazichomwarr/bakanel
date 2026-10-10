@@ -42,6 +42,30 @@ export type TrainingDomainsDictionary = {
   items: Record<TrainingDomainKey, TrainingDomainContent>;
 };
 
+export type TrainingCatalogueDictionary = {
+  metaTitle: string;
+  metaDescription: string;
+  eyebrow: string;
+  title: string;
+  description: string;
+  insuranceNote: string;
+  programmeLabel: string;
+  domainLabel: string;
+  topicLabel: string;
+  enquiryLabel: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  unavailableTitle: string;
+  unavailableDescription: string;
+  previousPage: string;
+  nextPage: string;
+  pageLabel: string;
+  contactEyebrow: string;
+  contactTitle: string;
+  contactDescription: string;
+  contactCta: string;
+};
+
 export type ServiceContent = {
   name: string;
   metaDescription: string;
@@ -124,5 +148,6 @@ export type PublicDictionary = {
   languageSelector: string;
   home: HomeDictionary;
   trainingDomains: TrainingDomainsDictionary;
+  trainingCatalogue: TrainingCatalogueDictionary;
   services: ServicesDictionary;
 };

@@ -8,6 +8,7 @@ export type {
   PublicDictionary,
   ServiceContent,
   ServicesDictionary,
+  TrainingCatalogueDictionary,
   TrainingDomainContent,
   TrainingDomainsDictionary,
 } from "./types";

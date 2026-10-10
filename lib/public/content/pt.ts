@@ -17,6 +17,32 @@ export const pt: PublicDictionary = {
   aboutNav: "Sobre nós",
   servicesNav: "Serviços",
   languageSelector: "Escolher idioma",
+  trainingCatalogue: {
+    metaTitle: "Formações",
+    metaDescription:
+      "Descubra as formações profissionais publicadas pela W'BAKENEL Consulting Institute.",
+    eyebrow: "FORMAÇÕES",
+    title: "Formações pensadas para profissionais.",
+    description:
+      "Descubra os programas publicados da W'BAKENEL Consulting Institute, com prioridade para o setor segurador.",
+    insuranceNote: "Os seguros são a nossa área de especialização prioritária.",
+    programmeLabel: "Programa publicado",
+    domainLabel: "Domínio",
+    topicLabel: "Temática",
+    enquiryLabel: "Contacte-nos sobre esta formação",
+    emptyTitle: "Não há formações publicadas neste momento.",
+    emptyDescription: "Os próximos programas publicados aparecerão aqui.",
+    unavailableTitle: "O catálogo está temporariamente indisponível.",
+    unavailableDescription: "Tente novamente mais tarde ou contacte a nossa equipa pelo WhatsApp.",
+    previousPage: "Anterior",
+    nextPage: "Seguinte",
+    pageLabel: "Página",
+    contactEyebrow: "VAMOS CONVERSAR",
+    contactTitle: "Tem alguma questão sobre uma formação?",
+    contactDescription:
+      "A nossa equipa está disponível no WhatsApp para falar sobre as suas necessidades de formação.",
+    contactCta: "Enviar mensagem no WhatsApp",
+  },
   home: {
     eyebrow: "W'BAKENEL CONSULTING INSTITUTE",
     heroTitle: "Formar as competências que fazem avançar as organizações.",
