@@ -17,6 +17,9 @@ importers:
       '@prisma/adapter-neon':
         specifier: ^7.10.0
         version: 7.10.0
+      '@prisma/adapter-pg':
+        specifier: 7.10.0
+        version: 7.10.0
       '@prisma/client':
         specifier: 7.10.0
         version: 7.10.0(prisma@7.10.0(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(typescript@5.9.3))(typescript@5.9.3)
@@ -26,6 +29,9 @@ importers:
       next:
         specifier: 16.3.6
         version: 16.3.6(@babel/core@7.29.7)(@types/node@20.19.43)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      pg:
+        specifier: ^8.23.1
+        version: 8.23.1
       react:
         specifier: 19.2.8
         version: 19.2.8
@@ -39,9 +45,6 @@ importers:
         specifier: ^8.22.0
         version: 8.22.0
     devDependencies:
-      '@prisma/adapter-pg':
-        specifier: 7.10.0
-        version: 7.10.0
       '@tailwindcss/postcss':
         specifier: ^4
         version: 4.3.3
@@ -66,9 +69,6 @@ importers:
       eslint-config-next:
         specifier: 16.3.6
         version: 16.3.6(@typescript-eslint/parser@8.70.1(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3))(eslint@9.39.5(jiti@2.7.0))(typescript@5.9.3)
-      pg:
-        specifier: ^8.23.1
-        version: 8.23.1
       prettier:
         specifier: ^3.6.2
         version: 3.6.2

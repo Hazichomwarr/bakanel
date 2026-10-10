@@ -1,26 +1,28 @@
 import "server-only";
 
 import { PrismaNeon } from "@prisma/adapter-neon";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { neonConfig } from "@neondatabase/serverless";
 import ws from "ws";
 
-neonConfig.webSocketConstructor = ws;
-
-const connectionString = process.env.DATABASE_URL;
-
-if (!connectionString) {
-  throw new Error("DATABASE_URL must be configured to initialize Prisma.");
-}
+import { initializePrismaRuntime } from "./database/disposable-runtime";
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
 };
 
 const createPrismaClient = () => {
-  const adapter = new PrismaNeon({ connectionString });
+  return initializePrismaRuntime(process.env, {
+    createNeon(connectionString) {
+      neonConfig.webSocketConstructor = ws;
 
-  return new PrismaClient({ adapter });
+      return new PrismaClient({ adapter: new PrismaNeon({ connectionString }) });
+    },
+    createPostgres(connectionString) {
+      return new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+    },
+  });
 };
 
 export const prisma = globalForPrisma.prisma ?? createPrismaClient();
