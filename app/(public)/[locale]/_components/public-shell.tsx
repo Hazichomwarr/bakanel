@@ -247,10 +247,10 @@ export function PublicShell({
         {dictionary.skipToContent}
       </a>
       <header className="border-b border-[var(--wb-rule)] bg-[var(--wb-paper)]">
-        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:px-5">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-2 px-3 py-3 sm:px-5 md:grid md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:gap-6">
           <Link
             href={homePath}
-            className="wb-focus wb-mono shrink-0 text-base font-semibold tracking-tight sm:text-lg"
+            className="wb-focus wb-mono shrink-0 text-base font-semibold tracking-tight sm:text-lg md:justify-self-start"
           >
             W&apos;BAKENEL
           </Link>
@@ -274,19 +274,24 @@ export function PublicShell({
             </button>
           </div>
 
-          <nav className="hidden items-center gap-1 md:flex" aria-label={dictionary.navigation}>
+          <nav
+            className="hidden items-center justify-self-center gap-1 whitespace-nowrap md:flex"
+            aria-label={dictionary.navigation}
+          >
             {navigationItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={item.current}
-                className={`wb-focus min-h-10 px-2 text-sm font-medium ${
+                className={`wb-focus inline-flex min-h-10 items-center px-2 text-sm leading-none font-medium ${
                   item.current ? "underline underline-offset-4" : ""
                 }`}
               >
                 {item.label}
               </Link>
             ))}
+          </nav>
+          <div className="hidden items-center justify-self-end gap-2 md:flex">
             <PublicLanguageSelector
               locale={locale}
               dictionary={dictionary}
@@ -295,11 +300,11 @@ export function PublicShell({
             />
             <a
               href={WHATSAPP_CONTACT_URL}
-              className="wb-focus ml-1 min-h-10 border border-[var(--wb-green-deep)] px-3 py-2 text-sm font-medium"
+              className="wb-focus inline-flex min-h-10 items-center border border-[var(--wb-green-deep)] px-3 text-sm leading-none font-medium"
             >
               {dictionary.contact}
             </a>
-          </nav>
+          </div>
         </div>
       </header>
       {open ? (
