@@ -1,15 +1,21 @@
+import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { notFound } from "next/navigation";
 
 import "../../globals.css";
 import { dictionaries } from "@/lib/public/content";
 import { isPublicLocale, publicLocales } from "@/lib/public/locale";
+import { getPublicSiteUrl } from "@/lib/public/site-url";
 import { PublicShell } from "./_components/public-shell";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const dynamicParams = false;
+
+export const metadata: Metadata = {
+  metadataBase: getPublicSiteUrl() ?? undefined,
+};
 
 export function generateStaticParams() {
   return publicLocales.map((locale) => ({ locale }));

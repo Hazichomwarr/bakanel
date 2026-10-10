@@ -7,12 +7,14 @@ import { Breadcrumbs } from "../_components/breadcrumbs";
 import { ServicesCta } from "./_components/services-cta";
 import { dictionaries } from "@/lib/public/content";
 import { isPublicLocale, publicHref } from "@/lib/public/locale";
+import { localizedAlternates } from "@/lib/public/seo";
 import {
   complementaryServiceSlugs,
   getServiceContent,
   primaryServiceSlug,
   serviceHref,
   serviceImages,
+  servicesHref,
   servicesOverviewMetadata,
 } from "@/lib/public/services";
 import { priorityTrainingDomain, trainingDomainKeys } from "@/lib/public/training-domains";
@@ -28,7 +30,10 @@ export async function generateMetadata({ params }: ServicesOverviewProps): Promi
     return {};
   }
 
-  return servicesOverviewMetadata(dictionaries[locale]);
+  return {
+    ...servicesOverviewMetadata(dictionaries[locale]),
+    alternates: localizedAlternates(servicesHref, locale),
+  };
 }
 
 export default async function ServicesOverviewPage({ params }: ServicesOverviewProps) {

@@ -10,6 +10,7 @@ import { HomeTrainingPreview } from "./_components/home-training-preview";
 import { dictionaries } from "@/lib/public/content";
 import { getHomepageTrainingPreview } from "@/lib/public/homepage";
 import { isPublicLocale } from "@/lib/public/locale";
+import { homepageAlternates } from "@/lib/public/seo";
 
 export const dynamic = "force-dynamic";
 
@@ -29,6 +30,7 @@ export async function generateMetadata({ params }: PublicHomepageProps): Promise
   return {
     title: "W'BAKENEL Consulting Institute",
     description: dictionary.home.heroDescription,
+    alternates: homepageAlternates(locale),
   };
 }
 

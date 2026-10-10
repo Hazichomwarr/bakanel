@@ -4,7 +4,13 @@ import { notFound } from "next/navigation";
 import { ServiceDetail } from "../_components/service-detail";
 import { dictionaries } from "@/lib/public/content";
 import { isPublicLocale } from "@/lib/public/locale";
-import { isServiceSlug, serviceDetailMetadata, serviceSlugs } from "@/lib/public/services";
+import { localizedAlternates } from "@/lib/public/seo";
+import {
+  isServiceSlug,
+  serviceDetailMetadata,
+  serviceHref,
+  serviceSlugs,
+} from "@/lib/public/services";
 
 // Only the allowlisted service slugs exist; any other segment returns 404.
 export const dynamicParams = false;
@@ -24,7 +30,10 @@ export async function generateMetadata({ params }: ServiceDetailPageProps): Prom
     return {};
   }
 
-  return serviceDetailMetadata(dictionaries[locale], service);
+  return {
+    ...serviceDetailMetadata(dictionaries[locale], service),
+    alternates: localizedAlternates((targetLocale) => serviceHref(targetLocale, service), locale),
+  };
 }
 
 export default async function ServiceDetailPage({ params }: ServiceDetailPageProps) {

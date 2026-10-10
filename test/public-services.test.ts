@@ -225,7 +225,17 @@ describe("service metadata", () => {
       });
       const overview = dictionaries[locale].services.overview;
 
-      expect(metadata).toEqual(servicesOverviewMetadata(dictionaries[locale]));
+      expect(metadata).toEqual({
+        ...servicesOverviewMetadata(dictionaries[locale]),
+        alternates: {
+          canonical: `/${locale}/services`,
+          languages: {
+            fr: "/fr/services",
+            en: "/en/services",
+            pt: "/pt/services",
+          },
+        },
+      });
       expect(metadata.title).toBe(`${overview.metaTitle} | W'BAKENEL Consulting Institute`);
       expect(metadata.description).toBe(overview.metaDescription);
       titles.add(metadata.title);
@@ -242,7 +252,17 @@ describe("service metadata", () => {
         const service = getServiceContent(dictionaries[locale], slug);
         const metadata = await serviceDetailRoute.generateMetadata(detailParams(locale, slug));
 
-        expect(metadata).toEqual(serviceDetailMetadata(dictionaries[locale], slug));
+        expect(metadata).toEqual({
+          ...serviceDetailMetadata(dictionaries[locale], slug),
+          alternates: {
+            canonical: `/${locale}/services/${slug}`,
+            languages: {
+              fr: `/fr/services/${slug}`,
+              en: `/en/services/${slug}`,
+              pt: `/pt/services/${slug}`,
+            },
+          },
+        });
         expect(metadata.title).toBe(`${service.name} | W'BAKENEL Consulting Institute`);
         expect(metadata.description).toBe(service.metaDescription);
         descriptions.add(metadata.description);
