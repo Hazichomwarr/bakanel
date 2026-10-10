@@ -1,13 +1,19 @@
 import Link from "next/link";
 import { requireAdmin } from "@/lib/auth/current-admin";
-import { adminCatalogueReader } from "@/lib/admin/catalogue.read";
+import { adminCatalogueReader, adminProgrammePage } from "@/lib/admin/catalogue.read";
 import { CatalogueHeader, PrimaryLink, QuietLink, frenchName, statusLabel } from "./components";
+import { ProgrammeList } from "./programme-list";
 
-export default async function AdminFormationsPage() {
+export default async function AdminFormationsPage(props: PageProps<"/admin/formations">) {
   await requireAdmin();
-  const domains = await adminCatalogueReader.overview();
+  const requestedPage = adminProgrammePage((await props.searchParams).page);
+  const [domains, programmes] = await Promise.all([
+    adminCatalogueReader.overview(),
+    adminCatalogueReader.programmes(requestedPage),
+  ]);
   return <div className="space-y-12"><CatalogueHeader title="Catalogue de formation" description="Structurez les domaines, thématiques et formations proposées par W’BAKENEL." actions={<PrimaryLink href="/admin/formations/nouvelle">Nouvelle formation</PrimaryLink>} />
-    <section aria-labelledby="catalogue-heading"><div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-[#c8cac0] pb-4"><h2 id="catalogue-heading" className="wb-mono text-xs tracking-[0.16em] text-[#245b49]">CATALOGUE</h2><div className="flex gap-5"><QuietLink href="/admin/formations/domaines/nouveau">Ajouter un domaine</QuietLink><QuietLink href="/admin/formations/thematiques/nouvelle">Ajouter une thématique</QuietLink></div></div>
+    <ProgrammeList result={programmes} />
+    <section aria-labelledby="catalogue-heading"><div className="flex flex-wrap items-baseline justify-between gap-4 border-b border-[#c8cac0] pb-4"><h2 id="catalogue-heading" className="wb-mono text-xs tracking-[0.16em] text-[#245b49]">DOMAINES ET THÉMATIQUES</h2><div className="flex gap-5"><QuietLink href="/admin/formations/domaines/nouveau">Ajouter un domaine</QuietLink><QuietLink href="/admin/formations/thematiques/nouvelle">Ajouter une thématique</QuietLink></div></div>
       {domains.length === 0 ? <div className="py-14"><h3 className="text-2xl font-semibold">Aucun domaine de formation</h3><p className="mt-3 max-w-xl leading-7 text-[#626862]">Commencez par structurer le catalogue de W’BAKENEL avec son premier domaine.</p><PrimaryLink href="/admin/formations/domaines/nouveau">Ajouter un domaine</PrimaryLink></div> : <div className="divide-y divide-[#c8cac0]">{domains.map((domain) => { const trainingCount = domain.topics.reduce((count, topic) => count + topic.trainings.length, 0); return <article key={domain.id} className="py-7"><div className="flex flex-wrap items-start justify-between gap-4"><div><Link href={`/admin/formations/domaines/${domain.id}`} className="wb-focus text-xl font-semibold hover:text-[#245b49]">{frenchName(domain.translations)}</Link><p className="mt-2 text-sm text-[#626862]">{domain.topics.length} thématique{domain.topics.length !== 1 ? "s" : ""} · {trainingCount} formation{trainingCount !== 1 ? "s" : ""}</p></div><p className="text-sm text-[#626862]">{statusLabel[domain.status]}</p></div>{domain.topics.length ? <ul className="mt-6 grid gap-3 border-l border-[#c8cac0] pl-5 md:grid-cols-2">{domain.topics.map((topic) => <li key={topic.id}><Link href={`/admin/formations/thematiques/${topic.id}`} className="wb-focus font-medium hover:text-[#245b49]">{frenchName(topic.translations)}</Link><span className="ml-2 text-sm text-[#626862]">{topic.trainings.length} formation{topic.trainings.length !== 1 ? "s" : ""}</span></li>)}</ul> : <p className="mt-5 text-sm text-[#626862]">Aucune thématique. <Link href={`/admin/formations/thematiques/nouvelle?domainId=${domain.id}`} className="wb-action wb-focus underline">Ajouter une thématique</Link></p>}</article>; })}</div>}
     </section></div>;
 }

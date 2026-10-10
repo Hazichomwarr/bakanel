@@ -1,5 +1,6 @@
 "use server";
 
+import { unexpectedAdminActionError } from "@/lib/admin/action-errors";
 import { Locale } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -16,7 +17,7 @@ const locale = (data: FormData) => {
   return candidate === Locale.FR || candidate === Locale.EN || candidate === Locale.PT ? candidate : null;
 };
 const adminError = (error: unknown) => {
-  if (!(error instanceof CatalogueDomainError)) return "Une erreur technique est survenue. Réessayez dans un instant.";
+  if (!(error instanceof CatalogueDomainError)) return unexpectedAdminActionError("catalogue", error);
   const messages: Record<CatalogueDomainError["code"], string> = {
     DOMAIN_NOT_FOUND: "Ce domaine n’existe plus.", TOPIC_NOT_FOUND: "Cette thématique n’existe plus.", TRAINING_NOT_FOUND: "Cette formation n’existe plus.", TRANSLATION_NOT_FOUND: "Cette traduction n’existe pas encore.",
     INVALID_CATALOGUE_TRANSITION: "Cette transition d’état n’est pas autorisée.", CATALOGUE_ENTITY_ESTABLISHED: "Cet élément établi doit être archivé, pas supprimé.", CATALOGUE_ENTITY_HAS_DEPENDENCIES: "Cet élément est encore utilisé et ne peut pas être supprimé.",

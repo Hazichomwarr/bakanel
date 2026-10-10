@@ -1,5 +1,6 @@
 "use server";
 
+import { unexpectedAdminActionError } from "@/lib/admin/action-errors";
 import { EngagementType, Locale } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -57,7 +58,7 @@ function revalidateClientPaths(path: string) {
 
 function actionErrorMessage(error: unknown) {
   if (!(error instanceof ClientWorkDomainError)) {
-    return "Une erreur technique est survenue. Réessayez dans un instant.";
+    return unexpectedAdminActionError("clients", error);
   }
 
   const messages: Record<ClientWorkDomainError["code"], string> = {

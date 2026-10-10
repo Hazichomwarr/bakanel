@@ -40,20 +40,33 @@ body {
   letter-spacing: -0.035em;
 }
 
-.wb-kicker {
-  color: var(--wb-green);
-  font-family: var(--font-geist-mono), ui-monospace, monospace;
-  font-size: 0.75rem;
-  letter-spacing: 0.16em;
+/*
+ * Component layer, so a Tailwind text-colour utility on the same element wins. Kickers on
+ * evergreen sections set a light colour (for example text-[#c9d8c8]); unlayered, this green
+ * overrode it and produced 1.63:1 contrast.
+ */
+@layer components {
+  .wb-kicker {
+    color: var(--wb-green);
+    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-size: 0.75rem;
+    letter-spacing: 0.16em;
+  }
 }
 
 .wb-rule {
   border-color: var(--wb-rule);
 }
 
+/*
+ * Two-tone focus ring: an ivory inner band and an evergreen outer outline. The outline carries
+ * the contrast on ivory surfaces and the ivory band on evergreen surfaces, so the indicator
+ * stays at least 3:1 against its surroundings on both without per-section variants.
+ */
 .wb-focus:focus-visible {
+  box-shadow: 0 0 0 2px var(--wb-paper);
   outline: 2px solid var(--wb-green);
-  outline-offset: 3px;
+  outline-offset: 2px;
 }
 
 .wb-action {

@@ -7,6 +7,12 @@ after the shared disposable-database guard approves `TEST_DATABASE_URL`.
 pnpm dev:disposable -- -p 3013
 ```
 
+The server binds to `127.0.0.1` by default. `next dev` otherwise listens on every network
+interface, which would expose the synthetic administrator and the disposable database to the
+local network. An explicit `-H`/`--hostname` is accepted only for `127.0.0.1`, `localhost`, or
+`::1`; any other value stops the command before Next.js starts. No current workflow requires a
+non-loopback binding.
+
 This command is intentionally separate from `pnpm dev`. It sets
 `BAKANEL_DISPOSABLE_DATABASE=1`; a local-looking database URL, `NODE_ENV=test`, or any other
 environment setting cannot select the PostgreSQL adapter by itself.

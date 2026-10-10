@@ -1,5 +1,6 @@
 "use server";
 
+import { unexpectedAdminActionError } from "@/lib/admin/action-errors";
 import { Locale } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -39,7 +40,7 @@ function redirected(error: unknown) {
 
 function message(error: unknown) {
   if (!(error instanceof ArticleDomainError))
-    return "Une erreur technique est survenue. Réessayez dans un instant.";
+    return unexpectedAdminActionError("articles", error);
   const messages: Record<ArticleDomainError["code"], string> = {
     ARTICLE_NOT_FOUND: "Cet article n’existe plus.",
     INVALID_ARTICLE: "Les informations de l’article sont invalides.",

@@ -1,5 +1,6 @@
 "use server";
 
+import { unexpectedAdminActionError } from "@/lib/admin/action-errors";
 import { DeliveryMode, PricingMode } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -28,7 +29,7 @@ const facts = (data: FormData) => {
   return { startDate, endDate, registrationDeadline, deliveryMode, country: online ? null : nullable(data, "country"), city: online ? null : nullable(data, "city"), venue: online ? null : nullable(data, "venue"), pricingMode, price: onRequest ? null : nullable(data, "price"), currency: onRequest ? null : nullable(data, "currency"), capacity: configuredCapacity };
 };
 const errorMessage = (error: unknown) => {
-  if (!(error instanceof TrainingSessionDomainError)) return "Une erreur technique est survenue. Réessayez dans un instant.";
+  if (!(error instanceof TrainingSessionDomainError)) return unexpectedAdminActionError("sessions", error);
   const messages: Record<TrainingSessionDomainError["code"], string> = {
     SESSION_NOT_FOUND: "Cette session n’existe plus.", TRAINING_NOT_FOUND: "Cette formation n’existe plus.", EXPERT_NOT_FOUND: "Cet expert n’existe plus.", EXPERT_INACTIVE: "Cet expert n’est plus actif et ne peut pas être affecté.", INVALID_TRANSITION: "Cette transition d’état n’est pas autorisée pour cette session.", SESSION_IMMUTABLE: "Cette session historique est en lecture seule.", STALE_SESSION_STATE: "La session a été modifiée entre-temps. Actualisez la page puis réessayez.", INVALID_DATE_RANGE: "La date de fin doit être postérieure ou égale à la date de début.", INVALID_REGISTRATION_DEADLINE: "La date limite d’inscription doit être au plus tard le jour du début.", INVALID_PRICING: "Le mode de tarification et le prix ne sont pas cohérents.", INVALID_CURRENCY: "La devise doit être un code ISO 4217 pris en charge.", INVALID_LOCATION: "Une session en présentiel requiert un pays et une ville.", INVALID_COUNTRY: "Le pays doit être un code ISO 3166-1 alpha-2 valide.", INVALID_CAPACITY: "La capacité doit être un nombre entier positif.", EXPERT_ALREADY_ASSIGNED: "Cet expert est déjà affecté à cette session.", EXPERT_NOT_ASSIGNED: "Cet expert n’est pas affecté à cette session.",
   };

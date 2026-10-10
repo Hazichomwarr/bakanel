@@ -1,4 +1,5 @@
 "use server";
+import { unexpectedAdminActionError } from "@/lib/admin/action-errors";
 import { Locale } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -12,7 +13,7 @@ const optional = (data: FormData, key: string) => value(data, key) || null;
 const locale = (data: FormData) => { const candidate = value(data, "locale"); return candidate === Locale.FR || candidate === Locale.EN || candidate === Locale.PT ? candidate : null; };
 const order = (data: FormData) => { const raw = value(data, "displayOrder") || "0"; return /^-?\d+$/.test(raw) ? Number(raw) : null; };
 const errorMessage = (error: unknown) => {
-  if (!(error instanceof ExpertDomainError)) return "Une erreur technique est survenue. Réessayez dans un instant.";
+  if (!(error instanceof ExpertDomainError)) return unexpectedAdminActionError("experts", error);
   const messages: Record<ExpertDomainError["code"], string> = { EXPERT_NOT_FOUND: "Cet expert n’existe plus.", INVALID_EXPERT: "Le nom et l’ordre doivent être valides.", INVALID_EXPERT_TRANSITION: "Cette transition d’état n’est pas autorisée.", INVALID_EXPERT_TRANSLATION: "Cette présentation est invalide. Un titre professionnel est requis pour la publier.", EXPERT_TRANSLATION_NOT_FOUND: "Cette traduction n’existe pas encore.", STALE_EXPERT_STATE: "Cet expert a été modifié entre-temps. Actualisez la page puis réessayez." };
   return messages[error.code];
 };
