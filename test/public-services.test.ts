@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 import { HomeComplementaryServices } from "../app/(public)/[locale]/_components/home-complementary-services";
+import { HomeHero } from "../app/(public)/[locale]/_components/home-hero";
 import * as serviceDetailRoute from "../app/(public)/[locale]/services/[service]/page";
 import * as servicesOverviewRoute from "../app/(public)/[locale]/services/page";
 import { dictionaries } from "../lib/public/content";
@@ -334,6 +335,21 @@ describe("homepage complementary services", () => {
       expect(markup).toContain(dictionary.home.complementaryOverviewCta);
     },
   );
+});
+
+describe("homepage hero", () => {
+  it.each(publicLocales)("uses localized training photography in %s", (locale) => {
+    const home = dictionaries[locale].home;
+    const markup = readableText(
+      renderToStaticMarkup(createElement(HomeHero, { dictionary: home })),
+    );
+
+    expect(markup).toContain(home.heroImageAlt);
+    expect(markup).toContain("hero.png");
+    expect(hrefs(markup)).toEqual(
+      expect.arrayContaining(["#formations", "https://wa.me/22651513197"]),
+    );
+  });
 });
 
 describe("training-first services pages", () => {

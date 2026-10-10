@@ -5,6 +5,7 @@ export type HomeDictionary = {
   eyebrow: string;
   heroTitle: string;
   heroDescription: string;
+  heroImageAlt: string;
   trainingCta: string;
   heroContactCta: string;
   domainsDetailCta: string;

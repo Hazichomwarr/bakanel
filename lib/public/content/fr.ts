@@ -22,6 +22,8 @@ export const fr: PublicDictionary = {
     heroTitle: "Former les compétences qui font avancer les organisations.",
     heroDescription:
       "W'BAKENEL Consulting Institute propose des formations professionnelles en assurance, gestion de projet et statistique, avec une priorité accordée au secteur des assurances.",
+    heroImageAlt:
+      "Des professionnels réunis autour d'un ordinateur lors d'une séance de formation.",
     trainingCta: "Découvrir nos formations",
     heroContactCta: "Nous contacter",
     domainsDetailCta: "En savoir plus sur la formation professionnelle",

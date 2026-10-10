@@ -22,6 +22,8 @@ export const pt: PublicDictionary = {
     heroTitle: "Formar as competências que fazem avançar as organizações.",
     heroDescription:
       "A W'BAKENEL Consulting Institute oferece formação profissional em seguros, gestão de projetos e estatística, com prioridade para o setor segurador.",
+    heroImageAlt:
+      "Profissionais reunidos à volta de um computador portátil durante uma sessão de formação.",
     trainingCta: "Conhecer as nossas formações",
     heroContactCta: "Contacte-nos",
     domainsDetailCta: "Saber mais sobre a formação profissional",

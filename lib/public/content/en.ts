@@ -22,6 +22,7 @@ export const en: PublicDictionary = {
     heroTitle: "Building the skills that move organisations forward.",
     heroDescription:
       "W'BAKENEL Consulting Institute offers professional training in insurance, project management and statistics, with priority given to the insurance sector.",
+    heroImageAlt: "Professionals gathered around a laptop during a training session.",
     trainingCta: "Explore our training",
     heroContactCta: "Contact us",
     domainsDetailCta: "Learn more about professional training",

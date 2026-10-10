@@ -6,17 +6,17 @@ import { HOME_TRAINING_SECTION_ID } from "./home-training-domains";
 
 export function HomeHero({ dictionary }: { dictionary: HomeDictionary }) {
   return (
-    <section className="overflow-hidden bg-[var(--wb-green-deep)] text-white">
-      <div className="mx-auto grid min-h-[660px] max-w-7xl items-stretch lg:grid-cols-[1.06fr_0.94fr]">
-        <div className="flex flex-col justify-center px-5 py-20 sm:px-8 lg:px-12 xl:px-16">
+    <section className="bg-[var(--wb-green-deep)] text-white">
+      <div className="mx-auto max-w-7xl px-5 py-14 sm:px-8 sm:py-16 lg:px-12 lg:py-20 xl:px-16">
+        <div className="max-w-3xl">
           <p className="wb-mono text-xs tracking-[0.18em] text-[#c9d8c8]">{dictionary.eyebrow}</p>
-          <h1 className="wb-editorial mt-7 max-w-3xl text-5xl leading-[0.98] font-medium sm:text-6xl lg:text-7xl">
+          <h1 className="wb-editorial mt-5 text-[clamp(2.625rem,11vw,3.5rem)] leading-[1.02] font-medium sm:mt-6 sm:text-6xl lg:text-7xl">
             {dictionary.heroTitle}
           </h1>
-          <p className="mt-8 max-w-xl text-lg leading-8 text-[#e2ece1]">
+          <p className="mt-6 max-w-xl text-base leading-7 text-[#e2ece1] sm:text-lg sm:leading-8">
             {dictionary.heroDescription}
           </p>
-          <div className="mt-10 flex flex-wrap gap-4">
+          <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:gap-4">
             <a className="wb-focus wb-button-light" href={`#${HOME_TRAINING_SECTION_ID}`}>
               {dictionary.trainingCta}
             </a>
@@ -25,17 +25,16 @@ export function HomeHero({ dictionary }: { dictionary: HomeDictionary }) {
             </a>
           </div>
         </div>
-        <div className="relative min-h-[340px] border-t border-white/20 lg:min-h-0 lg:border-t-0 lg:border-l">
-          <Image
-            src="/images/training.png"
-            alt=""
-            fill
-            loading="eager"
-            sizes="(max-width: 1023px) 100vw, 50vw"
-            className="object-cover"
-          />
-          <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(10,35,28,0.12),rgba(10,35,28,0.4))]" />
-        </div>
+      </div>
+      <div className="relative aspect-[4/3] w-full sm:aspect-[3/2] lg:aspect-[2/1]">
+        <Image
+          src="/images/hero.png"
+          alt={dictionary.heroImageAlt}
+          fill
+          loading="eager"
+          sizes="100vw"
+          className="object-cover object-[50%_52%]"
+        />
       </div>
     </section>
   );
