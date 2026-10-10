@@ -68,13 +68,14 @@ describe("public training catalogue route", () => {
     expect(markup).not.toContain("ARCHIVED");
   });
 
-  it("uses a WhatsApp enquiry action and never links to an unimplemented programme detail route", async () => {
+  it("links each eligible card to its localized programme detail and retains WhatsApp enquiries", async () => {
     listPublicTrainings.mockResolvedValue([publishedTraining]);
 
     const markup = await renderCatalogue("fr");
 
     expect(markup).toContain(`href="${WHATSAPP_CONTACT_URL}"`);
-    expect(markup).not.toContain(`/fr/formations/${publishedTraining.slug}`);
+    expect(markup).toContain(`href="/fr/formations/${publishedTraining.slug}"`);
+    expect(markup).toContain(dictionaries.fr.trainingCatalogue.detailLabel);
     expect(markup).toContain(
       `${dictionaries.fr.trainingCatalogue.enquiryLabel}: ${publishedTraining.title}`,
     );

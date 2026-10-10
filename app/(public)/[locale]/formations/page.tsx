@@ -150,16 +150,24 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
                       <dd className="mt-1 text-[var(--wb-ink)]">{training.topic.name}</dd>
                     </div>
                   </dl>
-                  <a
-                    className="wb-focus wb-text-link mt-auto pt-8"
-                    href={WHATSAPP_CONTACT_URL}
-                    aria-label={`${catalogue.enquiryLabel}: ${training.title}`}
-                  >
-                    {catalogue.enquiryLabel}
-                    <span aria-hidden="true" className="ml-2">
-                      →
-                    </span>
-                  </a>
+                  <div className="mt-auto flex flex-wrap gap-x-6 gap-y-4 pt-8">
+                    <Link
+                      className="wb-focus wb-text-link"
+                      href={`${catalogueHref(locale, 1)}/${encodeURIComponent(training.slug)}`}
+                    >
+                      {catalogue.detailLabel}
+                      <span aria-hidden="true" className="ml-2">
+                        →
+                      </span>
+                    </Link>
+                    <a
+                      className="wb-focus wb-text-link"
+                      href={WHATSAPP_CONTACT_URL}
+                      aria-label={`${catalogue.enquiryLabel}: ${training.title}`}
+                    >
+                      {catalogue.enquiryLabel}
+                    </a>
+                  </div>
                 </li>
               ))}
             </ul>

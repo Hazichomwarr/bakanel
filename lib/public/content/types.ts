@@ -52,6 +52,7 @@ export type TrainingCatalogueDictionary = {
   programmeLabel: string;
   domainLabel: string;
   topicLabel: string;
+  detailLabel: string;
   enquiryLabel: string;
   emptyTitle: string;
   emptyDescription: string;
@@ -60,6 +61,42 @@ export type TrainingCatalogueDictionary = {
   previousPage: string;
   nextPage: string;
   pageLabel: string;
+  contactEyebrow: string;
+  contactTitle: string;
+  contactDescription: string;
+  contactCta: string;
+};
+
+export type TrainingDetailDictionary = {
+  metadataDescription: string;
+  backToCatalogue: string;
+  programmeLabel: string;
+  domainLabel: string;
+  topicLabel: string;
+  descriptionLabel: string;
+  objectivesLabel: string;
+  audienceLabel: string;
+  programmeContentLabel: string;
+  unavailableTitle: string;
+  unavailableDescription: string;
+  sessionsEyebrow: string;
+  sessionsTitle: string;
+  sessionsDescription: string;
+  sessionsEmpty: string;
+  sessionsUnavailable: string;
+  datesLabel: string;
+  deliveryLabel: string;
+  locationLabel: string;
+  priceLabel: string;
+  registrationLabel: string;
+  onlineLabel: string;
+  inPersonLabel: string;
+  locationPending: string;
+  onRequestLabel: string;
+  pricePending: string;
+  registrationOpen: string;
+  registrationClosed: string;
+  sessionEnquiryLabel: string;
   contactEyebrow: string;
   contactTitle: string;
   contactDescription: string;
@@ -149,5 +186,6 @@ export type PublicDictionary = {
   home: HomeDictionary;
   trainingDomains: TrainingDomainsDictionary;
   trainingCatalogue: TrainingCatalogueDictionary;
+  trainingDetail: TrainingDetailDictionary;
   services: ServicesDictionary;
 };
