@@ -97,13 +97,22 @@ export function createTopic(
   });
 }
 
+/** Optional programme sections; omitted keys keep the default fixture text or stay empty. */
+type TrainingTranslationFixture = CatalogueTranslationFixture & {
+  summary?: string | null;
+  description?: string | null;
+  objectives?: string | null;
+  targetAudience?: string | null;
+  program?: string | null;
+};
+
 export function createTraining(
   client: PrismaClient,
   input: {
     trainingTopicId: string;
     status?: CatalogueStatusFixture;
     createdAt?: Date;
-    translations: CatalogueTranslationFixture[];
+    translations: TrainingTranslationFixture[];
   },
 ) {
   return client.training.create({
@@ -116,8 +125,17 @@ export function createTraining(
           locale: translation.locale,
           slug: `${FIXTURE_PREFIX}${translation.slug}`,
           title: `${FIXTURE_PREFIX}${translation.slug} title`,
-          summary: `${FIXTURE_PREFIX}${translation.slug} summary`,
-          description: `${FIXTURE_PREFIX}${translation.slug} description`,
+          summary:
+            translation.summary === undefined
+              ? `${FIXTURE_PREFIX}${translation.slug} summary`
+              : translation.summary,
+          description:
+            translation.description === undefined
+              ? `${FIXTURE_PREFIX}${translation.slug} description`
+              : translation.description,
+          objectives: translation.objectives ?? null,
+          targetAudience: translation.targetAudience ?? null,
+          program: translation.program ?? null,
           isPublished: translation.isPublished ?? true,
         })),
       },

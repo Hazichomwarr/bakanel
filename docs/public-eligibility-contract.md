@@ -34,13 +34,85 @@ future readers must not invent them.
 ## Implemented training reader
 
 `createPublicTrainingReader()` provides locale-explicit domain and topic lists, training lists,
-and training detail by requested-locale slug. It selects only translated presentation fields and
-maps them to DTOs without identifiers. Domain lists are capped at 48; topic and training lists
-use offset pagination with a default of 12 and maximum of 48. Taxonomy lists sort by display order
-and internal tie-breaker; training lists sort by creation time and internal tie-breaker. Offset
-pagination can shift when catalogue records change between requests. A localized slug is mutable
-in V1, so historic URLs are not preserved. Mocked query-shape unit tests run without a database; PostgreSQL integration coverage is
-described under "PostgreSQL integration verification".
+training detail by requested-locale slug, and alternate-locale slugs. It selects only translated
+presentation fields and maps them to DTOs without identifiers. Domain lists are capped at 48;
+topic and training lists use offset pagination with a default of 12 and maximum of 48. Taxonomy
+lists sort by display order and internal tie-breaker. A localized slug is mutable in V1, so
+historic URLs are not preserved. Mocked query-shape unit tests run without a database;
+PostgreSQL integration coverage is described under "PostgreSQL integration verification".
+
+### Training DTOs (BAK-PUBLIC-4B)
+
+- **`PublicTrainingDto`** (catalogue card, homepage preview): `slug`, `title`, `summary`,
+  `domain: { name, slug }`, `topic: { name, slug }`.
+- **`PublicTrainingDetailDto`** (programme detail): the card plus `description`, `objectives`,
+  `targetAudience`, and `program`. These are the actual `TrainingTranslation` columns; there is
+  no separate "programme content" field beyond `program`.
+- **`PublicTrainingAlternateDto`**: `{ locale, slug }`, where `locale` is a public locale code.
+
+Optional sections (`summary` and the four detail sections) are `null` when the requested
+locale's translation leaves them empty or whitespace-only, so presentation can omit them. A
+section is never filled from another locale. No DTO carries IDs, statuses, `isPublished`,
+display order, foreign keys, or audit timestamps.
+
+### Taxonomy labels
+
+Card and detail labels come from the training's own topic and that topic's domain, each through
+a nested `select` restricted to the requested locale and `isPublished: true` with `take: 1`. The
+query's `where` is still `publicTrainingWhere(locale)`, which already requires the topic and
+domain to be `PUBLISHED` with a published requested-locale translation, so a published training
+never exposes an unpublished or other-locale parent label. If a label is nonetheless missing
+when the row is mapped (for example, a concurrent unpublish), the row is dropped rather than
+shown without taxonomy. Labels are loaded in the same `findMany`/`findFirst` as the training,
+so there is no per-row query.
+
+### Catalogue ordering
+
+`listPublicTrainings` orders by:
+
+1. `TrainingDomain.displayOrder` ascending, then the domain's internal ID;
+2. `TrainingTopic.displayOrder` ascending, then the topic's internal ID;
+3. `Training.createdAt` ascending, then the training's internal ID.
+
+Each level ends with a unique tie-breaker, so a fixed dataset produces one sequence and offset
+pages are deterministic; programmes of the same domain (and topic) stay contiguous even when
+display orders tie. IDs are never returned. The homepage preview uses the same reader and
+order, so it shows the first eligible programmes of the highest-priority domain.
+
+The preferred business order (Assurance, Gestion de projet, Statistique) is configuration, not
+code: administrators set each domain's existing, admin-editable "Ordre d'affichage" (for
+example 10, 20, 30). The reader never compares translated names, and the static
+`lib/public/training-domains.ts` keys are institutional positioning content with no link to
+`TrainingDomain` rows. Until display orders are set, equal values fall back to internal-ID
+order, which is stable but not meaningful. No schema change was needed.
+
+### Programme detail
+
+`getPublicTrainingBySlug(locale, slug)` validates the locale first (an unsupported locale throws
+even for an empty slug), trims the slug, and returns `null` without querying when it is empty.
+Otherwise it combines the full public predicate with the requested locale, the slug, and
+`isPublished: true`, and selects only that translation. Draft, archived, unpublished-ancestor,
+unpublished-translation, and other-locale slugs return `null`.
+
+### Alternate-locale slugs
+
+`listPublicTrainingAlternates(locale, slug)` returns the published slugs of the same programme
+in the other public locales, in `fr`, `en`, `pt` order, excluding the requested locale. It runs
+one `findFirst` per other locale (two queries) whose `where` is
+`AND: [eligibleSource, publicTrainingWhere(target)]`: the source slug must be eligible in the
+requested locale, and the training, topic, domain, and their translations must also be published
+in the target locale. Only the target translation's `slug` is selected. A locale that fails any
+condition is absent; the reader never assumes slugs match across languages and never falls back
+to an unpublished translation. An empty slug returns `[]` without querying; an unsupported
+locale throws. When a locale is absent, the future language selector should link to that
+locale's catalogue overview. The selector itself is unchanged.
+
+### Historical-data limitations
+
+Completed sessions keep their `trainingId` relationship (`onDelete: Restrict`), but no
+historical snapshot of the programme title, slug, domain, or topic is stored. Readers show the
+current published translation and taxonomy; renaming, re-slugging, moving a training to another
+topic, or archiving it changes what is shown for its past sessions. There are no slug redirects.
 
 ## Implemented session reader
 
@@ -315,6 +387,20 @@ migration or fixture write.
   - Pagination with identical `createdAt` values is stable and ID-ordered.
   - The domain list caps at 48 rows.
   - An unsupported locale is rejected.
+- **Programme catalogue (`public-training-catalogue.int.test.ts`, BAK-PUBLIC-4B).**
+  - Detail returns every modeled section and the requested locale's taxonomy labels, with no
+    IDs, statuses, or timestamps.
+  - Missing and whitespace-only optional sections are `null`; no other locale is borrowed.
+  - Draft and archived programmes are hidden from lists, detail, and alternates and remain
+    stored.
+  - An unpublished requested-locale topic or domain translation, or an archived domain, hides
+    the programme.
+  - Ordering follows domain display order, topic display order, then creation time across
+    pages; tied display orders keep each domain contiguous; the homepage preview follows the
+    same order.
+  - Alternates include only target locales whose training translation and full ancestry are
+    published; unpublished translations, wrong-locale slugs, and draft ancestors yield none.
+  - Unsupported locales are rejected for detail and alternates.
 - **Sessions (`public-session.int.test.ts`, clock fixed at 2026-10-08T23:30Z).**
   - Upcoming `OPEN` and `CLOSED` sessions appear.
   - `CLOSED` and expired-deadline sessions remain listed with `registrationOpen: false`.

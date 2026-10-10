@@ -70,10 +70,16 @@ async function renderHomepage(locale: string) {
   return readableText(renderToStaticMarkup(page));
 }
 
+const publishedTaxonomy = {
+  domain: { name: "Assurance", slug: "assurance" },
+  topic: { name: "Sinistres", slug: "sinistres" },
+};
+
 const publishedTraining = {
   slug: "gestion-des-sinistres",
   title: "Gestion des sinistres",
   summary: "Résumé publié.",
+  ...publishedTaxonomy,
 };
 
 const CONNECTION_DETAILS = /secret|postgres|db\.internal/;
@@ -336,7 +342,10 @@ describe("homepage training preview states", () => {
   it.each(publicLocales)("lists published training in %s", (locale) => {
     const markup = renderPreview(locale, {
       status: "available",
-      trainings: [publishedTraining, { slug: "sans-resume", title: "Sans résumé", summary: null }],
+      trainings: [
+        publishedTraining,
+        { slug: "sans-resume", title: "Sans résumé", summary: null, ...publishedTaxonomy },
+      ],
     });
     const home = dictionaries[locale].home;
 

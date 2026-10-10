@@ -1,10 +1,6 @@
 import type { DeliveryMode, PricingMode } from "@prisma/client";
 
-export type PublicTrainingDto = {
-  slug: string;
-  title: string;
-  summary: string | null;
-};
+import type { PublicLocale } from "./locale-codes";
 
 export type PublicTrainingDomainDto = {
   name: string;
@@ -13,6 +9,35 @@ export type PublicTrainingDomainDto = {
 
 export type PublicTrainingTopicDto = {
   name: string;
+  slug: string;
+};
+
+/**
+ * Programme card. Domain and topic labels come from the requested locale's published
+ * translations of the training's eligible ancestors; they are never taken from another locale.
+ */
+export type PublicTrainingDto = {
+  slug: string;
+  title: string;
+  summary: string | null;
+  domain: PublicTrainingDomainDto;
+  topic: PublicTrainingTopicDto;
+};
+
+/**
+ * Programme detail: the card plus optional translated sections. A section is `null` when the
+ * requested locale's translation does not provide it, so presentation can omit it.
+ */
+export type PublicTrainingDetailDto = PublicTrainingDto & {
+  description: string | null;
+  objectives: string | null;
+  targetAudience: string | null;
+  program: string | null;
+};
+
+/** The same eligible programme's published slug in another public locale. */
+export type PublicTrainingAlternateDto = {
+  locale: PublicLocale;
   slug: string;
 };
 

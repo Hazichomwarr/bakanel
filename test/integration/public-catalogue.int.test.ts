@@ -113,6 +113,12 @@ describe("public catalogue readers against PostgreSQL", () => {
       slug: "it-audit-fr",
       title: "it-audit-fr title",
       summary: "it-audit-fr summary",
+      description: "it-audit-fr description",
+      objectives: null,
+      targetAudience: null,
+      program: null,
+      domain: { name: "it-audit-domain-fr", slug: "it-audit-domain-fr" },
+      topic: { name: "it-audit-topic-fr", slug: "it-audit-topic-fr" },
     });
     await expect(reader.getPublicTrainingBySlug("fr", "it-audit-en")).resolves.toBeNull();
     await expect(reader.getPublicTrainingBySlug("pt", "it-audit-fr")).resolves.toBeNull();
