@@ -12,9 +12,9 @@ source control, shell history, or ticket comments.
   it cannot restore safely into a second disposable target. This is not a passed restore test.
 - **Production hostname, hosting provider, and administrator: UNCONFIGURED/UNVERIFIED.** None is
   declared by this repository or configured by this runbook.
-- **Node runtime: reconcile before release.** The inspection shell used Node `v22.23.2`; release
-  verification commands used Node `v20.20.0`; the repository pins pnpm but has no `engines.node`
-  declaration. The hosting owner must select and pin one tested Node runtime before deployment.
+- **Node runtime: Node 22.x is required.** The inspection shell used Node `v22.23.2`; earlier
+  verification also used Node `v20.20.0`. The project now pins `engines.node` to `22.x`, which
+  passed the unit suite. Select Node 22.x in Vercel Project Settings too.
 - Every operational database read, migration, production write, push, and deployment requires
   separate explicit approval. This runbook authorizes none of those actions by itself.
 
@@ -76,6 +76,51 @@ source control, shell history, or ticket comments.
 
    Enter the password in the TTY prompt. Never pass it as an argument. A duplicate email fails
    safely; the command is not an idempotent credential-reset mechanism.
+
+## Vercel project setup and environment isolation
+
+1. Create or select the Vercel project and connect the approved repository. Set `main` as the
+   Production Branch. Vercel uses `pnpm build` through the project build command; do not configure
+   `pnpm start`, because Vercel runs the generated Next.js functions rather than a persistent
+   application process.
+2. Set Vercel's Node.js version to **22.x**. The matching `package.json` engine prevents a future
+   default Node major from silently changing the build/runtime.
+3. Set Production variables only after the owner has approved the real hostname and Neon
+   connection. A variable update needs a new deployment before it takes effect.
+4. Leave `SITE_URL` unset in Preview. The existing robots implementation then disallows indexing
+   and sitemap routes return 404. Do not set Preview `DATABASE_URL` to Production Neon.
+5. Until a separate, non-production Neon branch/database is provisioned, leave Preview
+   `DATABASE_URL` unset. This deliberately makes database-backed Preview pages unavailable rather
+   than allowing administrative or public reads/writes against production data. If preview data
+   access is required later, configure a distinct branch-specific Preview URL, with synthetic or
+   approved non-production data only.
+6. Keep the Vercel function region close to the chosen Neon region, and perform a connection-load
+   check before launch. The app uses Neon’s serverless Prisma adapter in Node functions; it does
+   not rely on in-memory sessions or a persistent process.
+
+### Vercel environment-variable matrix
+
+| Variable                           | Purpose                                                                           | Required           | Build/runtime                                                       | Vercel scope                                       | Secret | Validation / safe value                                                                                             |
+| ---------------------------------- | --------------------------------------------------------------------------------- | ------------------ | ------------------------------------------------------------------- | -------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------- |
+| `SITE_URL`                         | Authoritative canonical, alternate, robots, and sitemap origin                    | Production only    | Build and runtime                                                   | Production only                                    | No     | Must be verified HTTPS origin-only URL. Leave unset in Preview/Development to keep indexing disabled.               |
+| `DATABASE_URL`                     | Neon connection used by the Node Prisma-Neon adapter                              | Production runtime | Runtime; make available to build if Vercel evaluates server modules | Production only until isolated Preview Neon exists | Yes    | Required by Prisma initialization; never use `bakanel_test` or share Production URL with Preview.                   |
+| `ADMIN_CLIENT_IP_HEADER`           | Optional trusted-proxy IP header for the secondary login throttle                 | No                 | Runtime                                                             | Production only after header behavior is verified  | No     | Leave unset by default; per-account throttling remains active.                                                      |
+| `TEST_DATABASE_URL`                | Guarded local integration-test PostgreSQL target                                  | Never on Vercel    | Local test only                                                     | Development workstation only                       | Yes    | Must be loopback `bakanel_test`; guard rejects Neon, remote hosts, wrong names, and overlap.                        |
+| `BAKANEL_DISPOSABLE_DATABASE`      | Explicit opt-in for local disposable browser runtime                              | Never on Vercel    | Local test only                                                     | Development workstation only                       | No     | Must equal `1`; runtime independently rejects it when `NODE_ENV=production`.                                        |
+| `DIRECT_URL`                       | Not consumed by the application; only compared by the disposable guard if present | No                 | Separate authorized migration environment only                      | Do not configure for normal Vercel deployments     | Yes    | Never point it at the disposable target; no production migration is run by the Vercel build.                        |
+| Authentication/session secret      | Not applicable in V1                                                              | No                 | N/A                                                                 | N/A                                                | N/A    | Sessions use random server-generated tokens, stored only as hashes in PostgreSQL; no configured auth secret exists. |
+| Email/external-service credentials | Not applicable in V1                                                              | No                 | N/A                                                                 | N/A                                                | N/A    | No email or external credential is declared in the repository.                                                      |
+
+Vercel system variables such as `VERCEL_URL` must not be substituted for `SITE_URL`: they identify
+deployment URLs, while this application requires the owner-approved canonical production origin.
+
+### Migrations with Vercel and Neon
+
+Vercel builds run `prisma generate` through `pnpm build`; they must **not** run migrations. For an
+approved release, an operator runs the migration commands from the separate restricted migration
+environment described above, using a direct migration-capable Neon/PostgreSQL URL. Record the
+target endpoint, migration status, backup reference, operator, and release SHA. Only after that
+operation succeeds may the already-approved Vercel production deployment be promoted.
 
 ## Post-deployment smoke checks
 
