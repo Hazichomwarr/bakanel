@@ -59,7 +59,11 @@ function hrefs(markup: string) {
 function renderPreview(locale: PublicLocale, preview: HomepageTrainingPreview) {
   return readableText(
     renderToStaticMarkup(
-      createElement(HomeTrainingPreview, { dictionary: dictionaries[locale].home, preview }),
+      createElement(HomeTrainingPreview, {
+        locale,
+        dictionary: dictionaries[locale].home,
+        preview,
+      }),
     ),
   );
 }
@@ -264,6 +268,10 @@ describe("homepage section hierarchy", () => {
 });
 
 describe("homepage training preview reader", () => {
+  it("uses the six-programme showcase limit", () => {
+    expect(HOMEPAGE_TRAINING_LIMIT).toBe(6);
+  });
+
   it("delegates to the canonical public training reader with a bounded limit", async () => {
     const reader = {
       listPublicTrainings: vi.fn().mockResolvedValue([publishedTraining]),
@@ -352,6 +360,10 @@ describe("homepage training preview states", () => {
     expect(markup).toContain(publishedTraining.title);
     expect(markup).toContain(publishedTraining.summary);
     expect(markup).toContain(home.trainingNoSummary);
+    expect(markup).toContain(`href="/${locale}/formations/${publishedTraining.slug}"`);
+    expect(markup).toContain(`href="/${locale}/formations"`);
+    expect(markup).toContain(`${publishedTraining.domain.name} · ${publishedTraining.topic.name}`);
+    expect(markup).toContain(home.trainingCatalogueCta);
     expect(markup).not.toContain(home.trainingEmpty);
     expect(markup).not.toContain(home.trainingUnavailable);
   });
@@ -363,6 +375,8 @@ describe("homepage training preview states", () => {
     expect(markup).toContain(home.trainingEmpty);
     expect(markup).not.toContain(home.trainingUnavailable);
     expect(markup).not.toContain("<li");
+    expect(markup).toContain(`href="/${locale}/formations"`);
+    expect(markup).toContain(home.trainingCatalogueCta);
   });
 
   it.each(publicLocales)("shows a distinct temporary-unavailability state in %s", (locale) => {

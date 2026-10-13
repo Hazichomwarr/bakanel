@@ -52,7 +52,7 @@ export default async function PublicHomepage({ params }: PublicHomepageProps) {
         dictionary={dictionary.home}
         domains={dictionary.trainingDomains}
       />
-      <HomeTrainingPreview dictionary={dictionary.home} preview={trainingPreview} />
+      <HomeTrainingPreview locale={locale} dictionary={dictionary.home} preview={trainingPreview} />
       <HomeIntroduction dictionary={dictionary.home} />
       <HomeComplementaryServices locale={locale} dictionary={dictionary} />
       <HomeContactCta dictionary={dictionary.home} />

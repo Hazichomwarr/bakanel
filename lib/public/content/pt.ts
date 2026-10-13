@@ -99,6 +99,7 @@ export const pt: PublicDictionary = {
     trainingEyebrow: "FORMAÇÕES PUBLICADAS",
     trainingTitle: "Explorar os programas disponíveis.",
     trainingDescription: "Uma seleção de programas atualmente publicados no seu idioma.",
+    trainingCatalogueCta: "Ver todas as formações",
     trainingEmpty:
       "Não existem formações disponíveis neste idioma neste momento. A nossa equipa está disponível para falar sobre a sua necessidade.",
     trainingUnavailable:

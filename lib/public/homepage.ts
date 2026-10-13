@@ -6,7 +6,7 @@ import type { PublicTrainingDto } from "./dto";
 import type { PublicLocale } from "./locale";
 import { publicTrainingReader } from "./training.read";
 
-export const HOMEPAGE_TRAINING_LIMIT = 3;
+export const HOMEPAGE_TRAINING_LIMIT = 6;
 export { WHATSAPP_CONTACT_URL } from "./contact";
 
 type HomepageTrainingReader = {

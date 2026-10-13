@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import type { HomeDictionary } from "@/lib/public/content";
 import type { HomepageTrainingPreview } from "@/lib/public/homepage";
+import type { PublicLocale } from "@/lib/public/locale";
 
 function PreviewMessage({ children }: { children: React.ReactNode }) {
   return (
@@ -11,9 +14,11 @@ function PreviewMessage({ children }: { children: React.ReactNode }) {
 
 export function HomeTrainingPreview({
   dictionary,
+  locale,
   preview,
 }: {
   dictionary: HomeDictionary;
+  locale: PublicLocale;
   preview: HomepageTrainingPreview;
 }) {
   return (
@@ -36,14 +41,23 @@ export function HomeTrainingPreview({
           <p className="mt-6 text-lg leading-8 text-[#d9e7d8]">{dictionary.trainingDescription}</p>
         </div>
         {preview.status === "available" ? (
-          <ul className="mt-14 grid gap-px border border-white/20 bg-white/20 md:grid-cols-3">
+          <ul className="mt-14 grid gap-px border border-white/20 bg-white/20 md:grid-cols-2 xl:grid-cols-3">
             {preview.trainings.map((training) => (
               <li
                 key={training.slug}
                 className="flex min-h-64 flex-col bg-[var(--wb-green-deep)] p-7"
               >
-                <p className="wb-mono text-xs tracking-[0.16em] text-[#c9d8c8]">W&apos;BAKENEL</p>
-                <h3 className="mt-auto text-2xl font-medium tracking-tight">{training.title}</h3>
+                <p className="wb-mono text-xs tracking-[0.16em] text-[#c9d8c8]">
+                  {training.domain.name} · {training.topic.name}
+                </p>
+                <h3 className="mt-auto text-2xl font-medium tracking-tight">
+                  <Link
+                    className="wb-focus rounded-sm hover:text-[#c9d8c8]"
+                    href={`/${locale}/formations/${training.slug}`}
+                  >
+                    {training.title}
+                  </Link>
+                </h3>
                 <p className="mt-4 leading-7 text-[#d9e7d8]">
                   {training.summary ?? dictionary.trainingNoSummary}
                 </p>
@@ -51,6 +65,12 @@ export function HomeTrainingPreview({
             ))}
           </ul>
         ) : null}
+        <Link
+          className="wb-focus mt-10 inline-flex min-h-11 items-center border-b border-[#c9d8c8] text-sm font-medium hover:text-[#c9d8c8]"
+          href={`/${locale}/formations`}
+        >
+          {dictionary.trainingCatalogueCta}
+        </Link>
         {preview.status === "empty" ? (
           <PreviewMessage>{dictionary.trainingEmpty}</PreviewMessage>
         ) : null}

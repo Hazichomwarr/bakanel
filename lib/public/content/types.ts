@@ -12,6 +12,7 @@ export type HomeDictionary = {
   trainingEyebrow: string;
   trainingTitle: string;
   trainingDescription: string;
+  trainingCatalogueCta: string;
   trainingEmpty: string;
   trainingUnavailable: string;
   trainingNoSummary: string;

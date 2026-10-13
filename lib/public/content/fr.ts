@@ -98,6 +98,7 @@ export const fr: PublicDictionary = {
     trainingEyebrow: "FORMATIONS PUBLIÉES",
     trainingTitle: "Explorer les programmes disponibles.",
     trainingDescription: "Une sélection de programmes actuellement publiés dans votre langue.",
+    trainingCatalogueCta: "Voir toutes les formations",
     trainingEmpty:
       "Aucune formation n'est disponible dans cette langue pour le moment. Notre équipe reste disponible pour échanger sur votre besoin.",
     trainingUnavailable:

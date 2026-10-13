@@ -259,7 +259,7 @@ describe("public catalogue ordering against PostgreSQL", () => {
   });
 
   it("serves the homepage preview from the same eligible catalogue order", async () => {
-    for (const [index, displayOrder] of [40, 10, 30, 20].entries()) {
+    for (const [index, displayOrder] of [70, 10, 60, 20, 50, 30, 40].entries()) {
       const { topic } = await createPublishedTaxonomy(`home-${index}`, {
         domainDisplayOrder: displayOrder,
       });
@@ -278,6 +278,9 @@ describe("public catalogue ordering against PostgreSQL", () => {
       "it-home-10",
       "it-home-20",
       "it-home-30",
+      "it-home-40",
+      "it-home-50",
+      "it-home-60",
     ]);
   });
 });
