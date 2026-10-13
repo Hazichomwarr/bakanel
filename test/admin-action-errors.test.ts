@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const services = vi.hoisted(() => ({
-  createTrainingDomain: vi.fn(),
+  createTrainingDomainWithTranslation: vi.fn(),
   upsertTrainingDomainTranslation: vi.fn(),
 }));
 
@@ -57,7 +57,7 @@ function loggedOutput() {
 }
 
 beforeEach(() => {
-  services.createTrainingDomain.mockReset();
+  services.createTrainingDomainWithTranslation.mockReset();
   services.upsertTrainingDomainTranslation.mockReset();
   consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 });
@@ -107,7 +107,7 @@ describe("admin action diagnostic", () => {
 
 describe("admin action unexpected-error logging", () => {
   it("records one structured diagnostic and returns the generic message", async () => {
-    services.createTrainingDomain.mockRejectedValue(connectionFailure());
+    services.createTrainingDomainWithTranslation.mockRejectedValue(connectionFailure());
 
     await expect(createDomainAction({}, domainForm())).resolves.toEqual({
       error: UNEXPECTED_ADMIN_ACTION_MESSAGE,
@@ -123,7 +123,7 @@ describe("admin action unexpected-error logging", () => {
   });
 
   it("never logs credentials, tokens, connection strings, or submitted form data", async () => {
-    services.createTrainingDomain.mockRejectedValue(connectionFailure());
+    services.createTrainingDomainWithTranslation.mockRejectedValue(connectionFailure());
 
     await createDomainAction({}, domainForm());
 
@@ -133,7 +133,7 @@ describe("admin action unexpected-error logging", () => {
   });
 
   it("does not log expected domain errors", async () => {
-    services.createTrainingDomain.mockRejectedValue(
+    services.createTrainingDomainWithTranslation.mockRejectedValue(
       new CatalogueDomainError("SLUG_CONFLICT", "Domain slug already exists for this locale."),
     );
 
@@ -144,8 +144,7 @@ describe("admin action unexpected-error logging", () => {
   });
 
   it("does not log the redirect that completes a successful action", async () => {
-    services.createTrainingDomain.mockResolvedValue({ id: "domain-1" });
-    services.upsertTrainingDomainTranslation.mockResolvedValue({});
+    services.createTrainingDomainWithTranslation.mockResolvedValue({ id: "domain-1" });
 
     await expect(createDomainAction({}, domainForm())).rejects.toMatchObject({
       redirectTo: "/admin/formations/domaines/domain-1",
