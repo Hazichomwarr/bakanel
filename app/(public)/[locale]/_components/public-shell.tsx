@@ -625,14 +625,14 @@ export function PublicShell({
               {desktopTrainingsOpen ? (
                 <div
                   id="public-desktop-trainings-navigation"
-                  className="absolute top-full left-0 z-50 mt-2 max-h-[min(32rem,calc(100vh-5rem))] w-80 overflow-y-auto border border-[var(--wb-rule)] bg-[var(--wb-paper)] p-1 shadow-[0_12px_28px_rgba(24,33,29,0.16)]"
+                  className="absolute top-full left-0 z-50 mt-2 max-h-[min(32rem,calc(100vh-5rem))] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto whitespace-normal border border-[var(--wb-rule)] bg-[var(--wb-paper)] p-1 shadow-[0_12px_28px_rgba(24,33,29,0.16)]"
                 >
                   <Link
                     href={trainingsPath}
                     aria-current={
                       pathname === trainingsPath && !trainingSearch ? "page" : undefined
                     }
-                    className="wb-focus flex min-h-10 items-center px-3 text-sm font-medium hover:bg-[var(--wb-green-soft)]"
+                    className="wb-focus flex min-h-10 min-w-0 items-center break-words px-3 py-2 text-sm leading-5 font-medium whitespace-normal hover:bg-[var(--wb-green-soft)]"
                     onClick={() => {
                       selectTrainingFilter(null);
                       setDesktopTrainingsOpen(false);
@@ -673,7 +673,7 @@ export function PublicShell({
                                 ? "page"
                                 : undefined
                             }
-                            className="wb-focus flex min-h-10 items-center px-3 text-sm font-medium hover:bg-[var(--wb-green-soft)]"
+                            className="wb-focus flex min-h-10 min-w-0 items-center break-words px-3 py-2 text-sm leading-5 font-medium whitespace-normal hover:bg-[var(--wb-green-soft)]"
                             onClick={() => {
                               selectTrainingFilter({ kind: "domain", slug: domain.slug });
                               setDesktopTrainingsOpen(false);
@@ -693,7 +693,7 @@ export function PublicShell({
                                   ? "page"
                                   : undefined
                               }
-                              className="wb-focus flex min-h-10 items-center px-6 text-sm text-[var(--wb-muted)] hover:bg-[var(--wb-green-soft)] hover:text-[var(--wb-ink)]"
+                              className="wb-focus flex min-h-10 min-w-0 items-center break-words px-6 py-2 text-sm leading-5 text-[var(--wb-muted)] whitespace-normal hover:bg-[var(--wb-green-soft)] hover:text-[var(--wb-ink)]"
                               onClick={() => {
                                 selectTrainingFilter({ kind: "topic", slug: topic.slug });
                                 setDesktopTrainingsOpen(false);
@@ -743,14 +743,14 @@ export function PublicShell({
               {desktopServicesOpen ? (
                 <div
                   id="public-desktop-services-navigation"
-                  className="absolute top-full left-0 z-50 mt-2 w-72 border border-[var(--wb-rule)] bg-[var(--wb-paper)] p-1 shadow-[0_12px_28px_rgba(24,33,29,0.16)]"
+                  className="absolute top-full left-0 z-50 mt-2 max-h-[min(32rem,calc(100vh-5rem))] w-[min(22rem,calc(100vw-2rem))] overflow-y-auto whitespace-normal border border-[var(--wb-rule)] bg-[var(--wb-paper)] p-1 shadow-[0_12px_28px_rgba(24,33,29,0.16)]"
                 >
                   {serviceItems.map((item) => (
                     <Link
                       key={item.href}
                       href={item.href}
                       aria-current={item.current}
-                      className="wb-focus flex min-h-10 items-center px-3 text-sm font-medium hover:bg-[var(--wb-green-soft)]"
+                      className="wb-focus flex min-h-10 min-w-0 items-center break-words px-3 py-2 text-sm leading-5 font-medium whitespace-normal hover:bg-[var(--wb-green-soft)]"
                       onClick={() => setDesktopServicesOpen(false)}
                     >
                       {item.label}
