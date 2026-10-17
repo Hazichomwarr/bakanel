@@ -193,6 +193,11 @@ export type PublicDictionary = {
   allServicesNav: string;
   openServicesNav: string;
   closeServicesNav: string;
+  openTrainingsNav: string;
+  closeTrainingsNav: string;
+  trainingsNavigationLoading: string;
+  trainingsNavigationUnavailable: string;
+  trainingsNavigationEmpty: string;
   languageSelector: string;
   home: HomeDictionary;
   trainingDomains: TrainingDomainsDictionary;

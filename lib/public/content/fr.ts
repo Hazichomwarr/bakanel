@@ -19,6 +19,11 @@ export const fr: PublicDictionary = {
   allServicesNav: "Tous les services",
   openServicesNav: "Afficher les sous-pages de Services",
   closeServicesNav: "Masquer les sous-pages de Services",
+  openTrainingsNav: "Afficher les catégories de formations",
+  closeTrainingsNav: "Masquer les catégories de formations",
+  trainingsNavigationLoading: "Chargement des catégories de formations…",
+  trainingsNavigationUnavailable: "Les catégories de formations sont momentanément indisponibles.",
+  trainingsNavigationEmpty: "Aucune catégorie de formation publiée pour le moment.",
   languageSelector: "Choisir la langue",
   trainingCatalogue: {
     metaTitle: "Formations",

@@ -19,6 +19,23 @@ type NavigationItem = {
   current?: "page" | "true";
 };
 
+type TrainingNavigationTopic = {
+  name: string;
+  slug: string;
+};
+
+type TrainingNavigationDomain = TrainingNavigationTopic & {
+  topics: TrainingNavigationTopic[];
+};
+
+type TrainingNavigation = {
+  domains: TrainingNavigationDomain[];
+};
+
+type TrainingNavigationState =
+  | { status: "idle" | "loading" | "unavailable" }
+  | { status: "available"; navigation: TrainingNavigation };
+
 function servicesAriaCurrent(pathname: string, servicesPath: string, inServices: boolean) {
   if (pathname === servicesPath) {
     return "page";
@@ -55,6 +72,40 @@ function serviceNavigationItems(
       };
     }),
   ];
+}
+
+function isTrainingNavigation(value: unknown): value is TrainingNavigation {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return false;
+  }
+
+  const domains = (value as { domains?: unknown }).domains;
+  return (
+    Array.isArray(domains) &&
+    domains.every(
+      (domain) =>
+        domain &&
+        typeof domain === "object" &&
+        typeof (domain as TrainingNavigationDomain).name === "string" &&
+        typeof (domain as TrainingNavigationDomain).slug === "string" &&
+        Array.isArray((domain as TrainingNavigationDomain).topics) &&
+        (domain as TrainingNavigationDomain).topics.every(
+          (topic) =>
+            topic &&
+            typeof topic === "object" &&
+            typeof (topic as TrainingNavigationTopic).name === "string" &&
+            typeof (topic as TrainingNavigationTopic).slug === "string",
+        ),
+    )
+  );
+}
+
+function trainingNavigationHref(
+  locale: PublicLocale,
+  filter: { kind: "domain" | "topic"; slug: string },
+) {
+  const query = new URLSearchParams({ [filter.kind]: filter.slug });
+  return `${trainingCatalogueHref(locale)}?${query.toString()}`;
 }
 
 type TrainingLocaleTargets = Partial<Record<PublicLocale, string>>;
@@ -274,14 +325,25 @@ export function PublicShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [desktopTrainingsOpen, setDesktopTrainingsOpen] = useState(false);
   const [desktopServicesOpen, setDesktopServicesOpen] = useState(false);
+  const [mobileTrainingsOpen, setMobileTrainingsOpen] = useState(false);
   const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
+  const [trainingNavigation, setTrainingNavigation] = useState<TrainingNavigationState>({
+    status: "idle",
+  });
+  const [trainingSearch, setTrainingSearch] = useState("");
   const [hash, setHash] = useState("");
   const pathname = usePathname() ?? publicHref(locale);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
+  const desktopTrainingsDisclosure = useRef<HTMLDivElement>(null);
+  const desktopTrainingsTrigger = useRef<HTMLButtonElement>(null);
   const desktopServicesDisclosure = useRef<HTMLDivElement>(null);
   const desktopServicesTrigger = useRef<HTMLButtonElement>(null);
+  const navigationRequest = useRef(0);
+  const navigationAbortController = useRef<AbortController | null>(null);
+  const navigationLocale = useRef(locale);
   const servicesPath = servicesHref(locale);
   const inServices = pathname === servicesPath || pathname.startsWith(`${servicesPath}/`);
   const servicesCurrent = servicesAriaCurrent(pathname, servicesPath, inServices);
@@ -300,6 +362,37 @@ export function PublicShell({
       window.removeEventListener("popstate", updateHash);
     };
   }, [pathname]);
+
+  useEffect(() => {
+    navigationLocale.current = locale;
+    navigationAbortController.current?.abort();
+  }, [locale]);
+
+  useEffect(() => {
+    if (!desktopTrainingsOpen) {
+      return;
+    }
+
+    const dismissOnPointerOutside = (event: PointerEvent) => {
+      if (!desktopTrainingsDisclosure.current?.contains(event.target as Node)) {
+        setDesktopTrainingsOpen(false);
+      }
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDesktopTrainingsOpen(false);
+        desktopTrainingsTrigger.current?.focus();
+      }
+    };
+
+    document.addEventListener("pointerdown", dismissOnPointerOutside);
+    document.addEventListener("keydown", dismissOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", dismissOnPointerOutside);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [desktopTrainingsOpen]);
 
   useEffect(() => {
     if (!desktopServicesOpen) {
@@ -362,21 +455,88 @@ export function PublicShell({
     return () => document.removeEventListener("keydown", key);
   }, [open]);
 
+  useEffect(() => {
+    return () => navigationAbortController.current?.abort();
+  }, []);
+
+  const loadTrainingNavigation = () => {
+    navigationAbortController.current?.abort();
+
+    const abortController = new AbortController();
+    const requestId = navigationRequest.current + 1;
+    navigationRequest.current = requestId;
+    navigationAbortController.current = abortController;
+    setTrainingNavigation({ status: "loading" });
+
+    void fetch(`/api/public/${locale}/training-navigation`, {
+      cache: "no-store",
+      signal: abortController.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          throw new Error("Training navigation request failed.");
+        }
+
+        const responseBody: unknown = await response.json();
+        if (!isTrainingNavigation(responseBody)) {
+          throw new Error("Training navigation response is invalid.");
+        }
+
+        if (
+          requestId === navigationRequest.current &&
+          navigationLocale.current === locale &&
+          !abortController.signal.aborted
+        ) {
+          setTrainingNavigation({ status: "available", navigation: responseBody });
+        }
+      })
+      .catch(() => {
+        if (
+          requestId === navigationRequest.current &&
+          navigationLocale.current === locale &&
+          !abortController.signal.aborted
+        ) {
+          setTrainingNavigation({ status: "unavailable" });
+        }
+      });
+  };
+
+  const toggleDesktopTrainings = () => {
+    if (desktopTrainingsOpen) {
+      setDesktopTrainingsOpen(false);
+      return;
+    }
+
+    setDesktopTrainingsOpen(true);
+    loadTrainingNavigation();
+  };
+
+  const toggleMobileTrainings = () => {
+    if (mobileTrainingsOpen) {
+      setMobileTrainingsOpen(false);
+      return;
+    }
+
+    setMobileTrainingsOpen(true);
+    loadTrainingNavigation();
+  };
+
+  const selectTrainingFilter = (filter: { kind: "domain" | "topic"; slug: string } | null) => {
+    setTrainingSearch(filter ? `?${new URLSearchParams({ [filter.kind]: filter.slug })}` : "");
+  };
+
   const navigationItems: NavigationItem[] = [
     {
       href: homePath,
       label: dictionary.homeNav,
       current: pathname === homePath ? "page" : undefined,
     },
-    {
-      href: trainingsPath,
-      label: dictionary.trainingsNav,
-      current:
-        pathname === trainingsPath || pathname.startsWith(`${trainingsPath}/`) ? "page" : undefined,
-    },
     { href: `${homePath}#a-propos`, label: dictionary.aboutNav },
   ];
   const serviceItems = serviceNavigationItems(locale, dictionary, pathname);
+  const trainingsCurrent =
+    pathname === trainingsPath || pathname.startsWith(`${trainingsPath}/`) ? "page" : undefined;
+  const activeTrainingFilter = new URLSearchParams(trainingSearch);
 
   return (
     <>
@@ -427,6 +587,127 @@ export function PublicShell({
                 {item.label}
               </Link>
             ))}
+            <div
+              ref={desktopTrainingsDisclosure}
+              className="relative flex items-center"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setDesktopTrainingsOpen(false);
+                }
+              }}
+            >
+              <Link
+                href={trainingsPath}
+                aria-current={trainingsCurrent}
+                className={`wb-focus inline-flex min-h-10 items-center px-2 text-sm leading-none font-medium ${
+                  trainingsCurrent ? "underline underline-offset-4" : ""
+                }`}
+                onClick={() => {
+                  selectTrainingFilter(null);
+                  setDesktopTrainingsOpen(false);
+                }}
+              >
+                {dictionary.trainingsNav}
+              </Link>
+              <button
+                ref={desktopTrainingsTrigger}
+                type="button"
+                aria-controls="public-desktop-trainings-navigation"
+                aria-expanded={desktopTrainingsOpen}
+                aria-label={
+                  desktopTrainingsOpen ? dictionary.closeTrainingsNav : dictionary.openTrainingsNav
+                }
+                className="wb-focus inline-flex min-h-10 min-w-10 items-center justify-center text-sm"
+                onClick={toggleDesktopTrainings}
+              >
+                <span aria-hidden="true">▾</span>
+              </button>
+              {desktopTrainingsOpen ? (
+                <div
+                  id="public-desktop-trainings-navigation"
+                  className="absolute top-full left-0 z-50 mt-2 max-h-[min(32rem,calc(100vh-5rem))] w-80 overflow-y-auto border border-[var(--wb-rule)] bg-[var(--wb-paper)] p-1 shadow-[0_12px_28px_rgba(24,33,29,0.16)]"
+                >
+                  <Link
+                    href={trainingsPath}
+                    aria-current={
+                      pathname === trainingsPath && !trainingSearch ? "page" : undefined
+                    }
+                    className="wb-focus flex min-h-10 items-center px-3 text-sm font-medium hover:bg-[var(--wb-green-soft)]"
+                    onClick={() => {
+                      selectTrainingFilter(null);
+                      setDesktopTrainingsOpen(false);
+                    }}
+                  >
+                    {dictionary.trainingCatalogue.allProgrammesLabel}
+                  </Link>
+                  {trainingNavigation.status === "loading" ? (
+                    <p
+                      className="px-3 py-2 text-sm text-[var(--wb-muted)]"
+                      role="status"
+                      aria-live="polite"
+                    >
+                      {dictionary.trainingsNavigationLoading}
+                    </p>
+                  ) : null}
+                  {trainingNavigation.status === "unavailable" ? (
+                    <p className="px-3 py-2 text-sm text-[var(--wb-muted)]" role="status">
+                      {dictionary.trainingsNavigationUnavailable}
+                    </p>
+                  ) : null}
+                  {trainingNavigation.status === "available" &&
+                  trainingNavigation.navigation.domains.length === 0 ? (
+                    <p className="px-3 py-2 text-sm text-[var(--wb-muted)]" role="status">
+                      {dictionary.trainingsNavigationEmpty}
+                    </p>
+                  ) : null}
+                  {trainingNavigation.status === "available"
+                    ? trainingNavigation.navigation.domains.map((domain) => (
+                        <div key={domain.slug} className="border-t border-[var(--wb-rule)] py-1">
+                          <Link
+                            href={trainingNavigationHref(locale, {
+                              kind: "domain",
+                              slug: domain.slug,
+                            })}
+                            aria-current={
+                              activeTrainingFilter.get("domain") === domain.slug
+                                ? "page"
+                                : undefined
+                            }
+                            className="wb-focus flex min-h-10 items-center px-3 text-sm font-medium hover:bg-[var(--wb-green-soft)]"
+                            onClick={() => {
+                              selectTrainingFilter({ kind: "domain", slug: domain.slug });
+                              setDesktopTrainingsOpen(false);
+                            }}
+                          >
+                            {domain.name}
+                          </Link>
+                          {domain.topics.map((topic) => (
+                            <Link
+                              key={topic.slug}
+                              href={trainingNavigationHref(locale, {
+                                kind: "topic",
+                                slug: topic.slug,
+                              })}
+                              aria-current={
+                                activeTrainingFilter.get("topic") === topic.slug
+                                  ? "page"
+                                  : undefined
+                              }
+                              className="wb-focus flex min-h-10 items-center px-6 text-sm text-[var(--wb-muted)] hover:bg-[var(--wb-green-soft)] hover:text-[var(--wb-ink)]"
+                              onClick={() => {
+                                selectTrainingFilter({ kind: "topic", slug: topic.slug });
+                                setDesktopTrainingsOpen(false);
+                              }}
+                            >
+                              {topic.name}
+                            </Link>
+                          ))}
+                        </div>
+                      ))
+                    : null}
+                </div>
+              ) : null}
+            </div>
             <div
               ref={desktopServicesDisclosure}
               className="relative flex items-center"
@@ -527,6 +808,106 @@ export function PublicShell({
                   {item.label}
                 </Link>
               ))}
+              <section>
+                <button
+                  type="button"
+                  aria-controls="public-mobile-trainings-navigation"
+                  aria-expanded={mobileTrainingsOpen}
+                  className="wb-focus flex min-h-10 w-full items-center justify-between text-left text-lg font-medium"
+                  onClick={toggleMobileTrainings}
+                >
+                  <span>{dictionary.trainingsNav}</span>
+                  <span aria-hidden="true">{mobileTrainingsOpen ? "▴" : "▾"}</span>
+                </button>
+                {mobileTrainingsOpen ? (
+                  <div
+                    id="public-mobile-trainings-navigation"
+                    className="mt-2 ml-2 flex flex-col border-l border-[var(--wb-rule)] pl-3"
+                  >
+                    <Link
+                      href={trainingsPath}
+                      aria-current={
+                        pathname === trainingsPath && !trainingSearch ? "page" : undefined
+                      }
+                      className="wb-focus flex min-h-10 items-center text-base font-medium"
+                      onClick={() => {
+                        selectTrainingFilter(null);
+                        setMobileTrainingsOpen(false);
+                        setOpen(false);
+                      }}
+                    >
+                      {dictionary.trainingCatalogue.allProgrammesLabel}
+                    </Link>
+                    {trainingNavigation.status === "loading" ? (
+                      <p
+                        className="py-2 text-sm text-[var(--wb-muted)]"
+                        role="status"
+                        aria-live="polite"
+                      >
+                        {dictionary.trainingsNavigationLoading}
+                      </p>
+                    ) : null}
+                    {trainingNavigation.status === "unavailable" ? (
+                      <p className="py-2 text-sm text-[var(--wb-muted)]" role="status">
+                        {dictionary.trainingsNavigationUnavailable}
+                      </p>
+                    ) : null}
+                    {trainingNavigation.status === "available" &&
+                    trainingNavigation.navigation.domains.length === 0 ? (
+                      <p className="py-2 text-sm text-[var(--wb-muted)]" role="status">
+                        {dictionary.trainingsNavigationEmpty}
+                      </p>
+                    ) : null}
+                    {trainingNavigation.status === "available"
+                      ? trainingNavigation.navigation.domains.map((domain) => (
+                          <div key={domain.slug} className="border-t border-[var(--wb-rule)] py-1">
+                            <Link
+                              href={trainingNavigationHref(locale, {
+                                kind: "domain",
+                                slug: domain.slug,
+                              })}
+                              aria-current={
+                                activeTrainingFilter.get("domain") === domain.slug
+                                  ? "page"
+                                  : undefined
+                              }
+                              className="wb-focus flex min-h-10 items-center text-base font-medium"
+                              onClick={() => {
+                                selectTrainingFilter({ kind: "domain", slug: domain.slug });
+                                setMobileTrainingsOpen(false);
+                                setOpen(false);
+                              }}
+                            >
+                              {domain.name}
+                            </Link>
+                            {domain.topics.map((topic) => (
+                              <Link
+                                key={topic.slug}
+                                href={trainingNavigationHref(locale, {
+                                  kind: "topic",
+                                  slug: topic.slug,
+                                })}
+                                aria-current={
+                                  activeTrainingFilter.get("topic") === topic.slug
+                                    ? "page"
+                                    : undefined
+                                }
+                                className="wb-focus flex min-h-10 items-center pl-3 text-sm text-[var(--wb-muted)]"
+                                onClick={() => {
+                                  selectTrainingFilter({ kind: "topic", slug: topic.slug });
+                                  setMobileTrainingsOpen(false);
+                                  setOpen(false);
+                                }}
+                              >
+                                {topic.name}
+                              </Link>
+                            ))}
+                          </div>
+                        ))
+                      : null}
+                  </div>
+                ) : null}
+              </section>
               <section>
                 <button
                   type="button"

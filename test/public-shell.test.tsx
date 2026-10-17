@@ -110,6 +110,26 @@ describe("public shell during static prerendering", () => {
     expect(markup).not.toContain('href="#formations"');
   });
 
+  it("keeps Formations as a direct overview link with an accessible desktop disclosure", () => {
+    const markup = renderShell("fr", "/fr/formations", <main>Contenu</main>);
+
+    expect(markup).toContain('href="/fr/formations"');
+    expect(markup).toContain('aria-controls="public-desktop-trainings-navigation"');
+    expect(markup).toContain(`aria-label="${dictionaries.fr.openTrainingsNav}"`);
+  });
+
+  it("provides complete localized training-navigation copy in every public locale", () => {
+    for (const locale of publicLocales) {
+      const dictionary = dictionaries[locale];
+
+      expect(dictionary.openTrainingsNav.trim()).not.toBe("");
+      expect(dictionary.closeTrainingsNav.trim()).not.toBe("");
+      expect(dictionary.trainingsNavigationLoading.trim()).not.toBe("");
+      expect(dictionary.trainingsNavigationUnavailable.trim()).not.toBe("");
+      expect(dictionary.trainingsNavigationEmpty.trim()).not.toBe("");
+    }
+  });
+
   it("preserves the localized catalogue route, query string, and hash while switching languages", () => {
     expect(localizedPublicHref("/fr/formations", "en", "page=2", "#programmes")).toBe(
       "/en/formations?page=2#programmes",
