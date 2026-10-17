@@ -94,12 +94,13 @@ describe("public shell during static prerendering", () => {
     expect(markup).toContain(dictionaries.fr.servicesNav);
   });
 
-  it("keeps Services as a direct overview link and gives its disclosure an accessible control", () => {
+  it("keeps Services as a direct overview link with focus-based desktop disclosure semantics", () => {
     const markup = renderShell("en", "/en/services/audits", <main>Content</main>);
 
     expect(markup).toContain('href="/en/services"');
     expect(markup).toContain('aria-controls="public-desktop-services-navigation"');
-    expect(markup).toContain(`aria-label="${dictionaries.en.openServicesNav}"`);
+    expect(markup).toContain('aria-expanded="false"');
+    expect(markup).not.toContain('aria-label="Open services navigation"');
     expect(markup).toContain('aria-current="true"');
   });
 
@@ -110,12 +111,13 @@ describe("public shell during static prerendering", () => {
     expect(markup).not.toContain('href="#formations"');
   });
 
-  it("keeps Formations as a direct overview link with an accessible desktop disclosure", () => {
+  it("keeps Formations as a direct overview link with focus-based desktop disclosure semantics", () => {
     const markup = renderShell("fr", "/fr/formations", <main>Contenu</main>);
 
     expect(markup).toContain('href="/fr/formations"');
     expect(markup).toContain('aria-controls="public-desktop-trainings-navigation"');
-    expect(markup).toContain(`aria-label="${dictionaries.fr.openTrainingsNav}"`);
+    expect(markup).toContain('aria-expanded="false"');
+    expect(markup).not.toContain('aria-label="Ouvrir la navigation des formations"');
   });
 
   it("provides complete localized training-navigation copy in every public locale", () => {

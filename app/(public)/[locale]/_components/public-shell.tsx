@@ -338,9 +338,10 @@ export function PublicShell({
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
   const desktopTrainingsDisclosure = useRef<HTMLDivElement>(null);
-  const desktopTrainingsTrigger = useRef<HTMLButtonElement>(null);
+  const desktopTrainingsLink = useRef<HTMLAnchorElement>(null);
   const desktopServicesDisclosure = useRef<HTMLDivElement>(null);
-  const desktopServicesTrigger = useRef<HTMLButtonElement>(null);
+  const desktopServicesLink = useRef<HTMLAnchorElement>(null);
+  const desktopDisclosureCloseTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
   const navigationRequest = useRef(0);
   const navigationAbortController = useRef<AbortController | null>(null);
   const navigationLocale = useRef(locale);
@@ -369,6 +370,14 @@ export function PublicShell({
   }, [locale]);
 
   useEffect(() => {
+    return () => {
+      if (desktopDisclosureCloseTimeout.current) {
+        clearTimeout(desktopDisclosureCloseTimeout.current);
+      }
+    };
+  }, []);
+
+  useEffect(() => {
     if (!desktopTrainingsOpen) {
       return;
     }
@@ -381,7 +390,7 @@ export function PublicShell({
     const dismissOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setDesktopTrainingsOpen(false);
-        desktopTrainingsTrigger.current?.focus();
+        desktopTrainingsLink.current?.focus();
       }
     };
 
@@ -407,7 +416,7 @@ export function PublicShell({
     const dismissOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setDesktopServicesOpen(false);
-        desktopServicesTrigger.current?.focus();
+        desktopServicesLink.current?.focus();
       }
     };
 
@@ -501,14 +510,50 @@ export function PublicShell({
       });
   };
 
-  const toggleDesktopTrainings = () => {
-    if (desktopTrainingsOpen) {
-      setDesktopTrainingsOpen(false);
-      return;
+  const clearDesktopDisclosureCloseTimeout = () => {
+    if (desktopDisclosureCloseTimeout.current) {
+      clearTimeout(desktopDisclosureCloseTimeout.current);
+      desktopDisclosureCloseTimeout.current = null;
     }
+  };
 
-    setDesktopTrainingsOpen(true);
-    loadTrainingNavigation();
+  const openDesktopTrainings = () => {
+    clearDesktopDisclosureCloseTimeout();
+    setDesktopServicesOpen(false);
+
+    if (!desktopTrainingsOpen) {
+      setDesktopTrainingsOpen(true);
+      loadTrainingNavigation();
+    }
+  };
+
+  const openDesktopServices = () => {
+    clearDesktopDisclosureCloseTimeout();
+    setDesktopTrainingsOpen(false);
+    setDesktopServicesOpen(true);
+  };
+
+  const scheduleDesktopDisclosureClose = (disclosure: "trainings" | "services") => {
+    clearDesktopDisclosureCloseTimeout();
+
+    desktopDisclosureCloseTimeout.current = setTimeout(() => {
+      const disclosureElement =
+        disclosure === "trainings"
+          ? desktopTrainingsDisclosure.current
+          : desktopServicesDisclosure.current;
+
+      if (disclosureElement?.contains(document.activeElement)) {
+        desktopDisclosureCloseTimeout.current = null;
+        return;
+      }
+
+      if (disclosure === "trainings") {
+        setDesktopTrainingsOpen(false);
+      } else {
+        setDesktopServicesOpen(false);
+      }
+      desktopDisclosureCloseTimeout.current = null;
+    }, 120);
   };
 
   const toggleMobileTrainings = () => {
@@ -590,6 +635,8 @@ export function PublicShell({
             <div
               ref={desktopTrainingsDisclosure}
               className="relative flex items-center"
+              onPointerEnter={openDesktopTrainings}
+              onPointerLeave={() => scheduleDesktopDisclosureClose("trainings")}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                   setDesktopTrainingsOpen(false);
@@ -597,11 +644,15 @@ export function PublicShell({
               }}
             >
               <Link
+                ref={desktopTrainingsLink}
                 href={trainingsPath}
                 aria-current={trainingsCurrent}
+                aria-controls="public-desktop-trainings-navigation"
+                aria-expanded={desktopTrainingsOpen}
                 className={`wb-focus inline-flex min-h-10 items-center px-2 text-sm leading-none font-medium ${
                   trainingsCurrent ? "underline underline-offset-4" : ""
                 }`}
+                onFocus={openDesktopTrainings}
                 onClick={() => {
                   selectTrainingFilter(null);
                   setDesktopTrainingsOpen(false);
@@ -609,19 +660,6 @@ export function PublicShell({
               >
                 {dictionary.trainingsNav}
               </Link>
-              <button
-                ref={desktopTrainingsTrigger}
-                type="button"
-                aria-controls="public-desktop-trainings-navigation"
-                aria-expanded={desktopTrainingsOpen}
-                aria-label={
-                  desktopTrainingsOpen ? dictionary.closeTrainingsNav : dictionary.openTrainingsNav
-                }
-                className="wb-focus inline-flex min-h-10 min-w-10 items-center justify-center text-sm"
-                onClick={toggleDesktopTrainings}
-              >
-                <span aria-hidden="true">▾</span>
-              </button>
               {desktopTrainingsOpen ? (
                 <div
                   id="public-desktop-trainings-navigation"
@@ -711,6 +749,8 @@ export function PublicShell({
             <div
               ref={desktopServicesDisclosure}
               className="relative flex items-center"
+              onPointerEnter={openDesktopServices}
+              onPointerLeave={() => scheduleDesktopDisclosureClose("services")}
               onBlur={(event) => {
                 if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
                   setDesktopServicesOpen(false);
@@ -718,28 +758,19 @@ export function PublicShell({
               }}
             >
               <Link
+                ref={desktopServicesLink}
                 href={servicesPath}
                 aria-current={servicesCurrent}
+                aria-controls="public-desktop-services-navigation"
+                aria-expanded={desktopServicesOpen}
                 className={`wb-focus inline-flex min-h-10 items-center px-2 text-sm leading-none font-medium ${
                   servicesCurrent ? "underline underline-offset-4" : ""
                 }`}
+                onFocus={openDesktopServices}
                 onClick={() => setDesktopServicesOpen(false)}
               >
                 {dictionary.servicesNav}
               </Link>
-              <button
-                ref={desktopServicesTrigger}
-                type="button"
-                aria-controls="public-desktop-services-navigation"
-                aria-expanded={desktopServicesOpen}
-                aria-label={
-                  desktopServicesOpen ? dictionary.closeServicesNav : dictionary.openServicesNav
-                }
-                className="wb-focus inline-flex min-h-10 min-w-10 items-center justify-center text-sm"
-                onClick={() => setDesktopServicesOpen((isOpen) => !isOpen)}
-              >
-                <span aria-hidden="true">▾</span>
-              </button>
               {desktopServicesOpen ? (
                 <div
                   id="public-desktop-services-navigation"
