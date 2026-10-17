@@ -178,6 +178,9 @@ describe("service dictionaries", () => {
 
       expect(Object.keys(services.items).sort()).toEqual([...serviceSlugs].sort());
       expect(dictionaries[locale].servicesNav.trim()).not.toBe("");
+      expect(dictionaries[locale].allServicesNav.trim()).not.toBe("");
+      expect(dictionaries[locale].openServicesNav.trim()).not.toBe("");
+      expect(dictionaries[locale].closeServicesNav.trim()).not.toBe("");
       expect(dictionaries[locale].homeNav.trim()).not.toBe("");
       expect(dictionaries[locale].trainingsNav.trim()).not.toBe("");
       expect(dictionaries[locale].aboutNav.trim()).not.toBe("");

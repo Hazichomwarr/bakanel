@@ -13,7 +13,7 @@ import {
   publicLocales,
   type PublicLocale,
 } from "@/lib/public/locale";
-import { servicesHref } from "@/lib/public/services";
+import { getServiceContent, serviceHref, serviceSlugs, servicesHref } from "@/lib/public/services";
 import { trainingCatalogueHref } from "@/lib/public/training-routes";
 
 type NavigationItem = {
@@ -32,6 +32,32 @@ function servicesAriaCurrent(pathname: string, servicesPath: string, inServices:
   }
 
   return undefined;
+}
+
+function serviceNavigationItems(
+  locale: PublicLocale,
+  dictionary: PublicDictionary,
+  pathname: string,
+): NavigationItem[] {
+  const overviewPath = servicesHref(locale);
+
+  return [
+    {
+      href: overviewPath,
+      label: dictionary.allServicesNav,
+      current: pathname === overviewPath ? "page" : undefined,
+    },
+    ...serviceSlugs.map((slug) => {
+      const href = serviceHref(locale, slug);
+      const current: NavigationItem["current"] = pathname === href ? "page" : undefined;
+
+      return {
+        href,
+        label: getServiceContent(dictionary, slug).name,
+        current,
+      };
+    }),
+  ];
 }
 
 type TrainingLocaleTargets = Partial<Record<PublicLocale, string>>;
@@ -251,10 +277,14 @@ export function PublicShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [desktopServicesOpen, setDesktopServicesOpen] = useState(false);
+  const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
   const [hash, setHash] = useState("");
   const pathname = usePathname() ?? publicHref(locale);
   const trigger = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLElement>(null);
+  const desktopServicesDisclosure = useRef<HTMLDivElement>(null);
+  const desktopServicesTrigger = useRef<HTMLButtonElement>(null);
   const servicesPath = servicesHref(locale);
   const inServices = pathname === servicesPath || pathname.startsWith(`${servicesPath}/`);
   const servicesCurrent = servicesAriaCurrent(pathname, servicesPath, inServices);
@@ -273,6 +303,32 @@ export function PublicShell({
       window.removeEventListener("popstate", updateHash);
     };
   }, [pathname]);
+
+  useEffect(() => {
+    if (!desktopServicesOpen) {
+      return;
+    }
+
+    const dismissOnPointerOutside = (event: PointerEvent) => {
+      if (!desktopServicesDisclosure.current?.contains(event.target as Node)) {
+        setDesktopServicesOpen(false);
+      }
+    };
+    const dismissOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setDesktopServicesOpen(false);
+        desktopServicesTrigger.current?.focus();
+      }
+    };
+
+    document.addEventListener("pointerdown", dismissOnPointerOutside);
+    document.addEventListener("keydown", dismissOnEscape);
+
+    return () => {
+      document.removeEventListener("pointerdown", dismissOnPointerOutside);
+      document.removeEventListener("keydown", dismissOnEscape);
+    };
+  }, [desktopServicesOpen]);
 
   useEffect(() => {
     if (!open) {
@@ -322,8 +378,8 @@ export function PublicShell({
         pathname === trainingsPath || pathname.startsWith(`${trainingsPath}/`) ? "page" : undefined,
     },
     { href: `${homePath}#a-propos`, label: dictionary.aboutNav },
-    { href: servicesPath, label: dictionary.servicesNav, current: servicesCurrent },
   ];
+  const serviceItems = serviceNavigationItems(locale, dictionary, pathname);
 
   return (
     <>
@@ -374,6 +430,57 @@ export function PublicShell({
                 {item.label}
               </Link>
             ))}
+            <div
+              ref={desktopServicesDisclosure}
+              className="relative flex items-center"
+              onBlur={(event) => {
+                if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                  setDesktopServicesOpen(false);
+                }
+              }}
+            >
+              <Link
+                href={servicesPath}
+                aria-current={servicesCurrent}
+                className={`wb-focus inline-flex min-h-10 items-center px-2 text-sm leading-none font-medium ${
+                  servicesCurrent ? "underline underline-offset-4" : ""
+                }`}
+                onClick={() => setDesktopServicesOpen(false)}
+              >
+                {dictionary.servicesNav}
+              </Link>
+              <button
+                ref={desktopServicesTrigger}
+                type="button"
+                aria-controls="public-desktop-services-navigation"
+                aria-expanded={desktopServicesOpen}
+                aria-label={
+                  desktopServicesOpen ? dictionary.closeServicesNav : dictionary.openServicesNav
+                }
+                className="wb-focus inline-flex min-h-10 min-w-10 items-center justify-center text-sm"
+                onClick={() => setDesktopServicesOpen((isOpen) => !isOpen)}
+              >
+                <span aria-hidden="true">▾</span>
+              </button>
+              {desktopServicesOpen ? (
+                <div
+                  id="public-desktop-services-navigation"
+                  className="absolute top-full left-0 z-50 mt-2 w-72 border border-[var(--wb-rule)] bg-[var(--wb-paper)] p-1 shadow-[0_12px_28px_rgba(24,33,29,0.16)]"
+                >
+                  {serviceItems.map((item) => (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      aria-current={item.current}
+                      className="wb-focus flex min-h-10 items-center px-3 text-sm font-medium hover:bg-[var(--wb-green-soft)]"
+                      onClick={() => setDesktopServicesOpen(false)}
+                    >
+                      {item.label}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
           </nav>
           <div className="hidden items-center justify-self-end gap-2 md:flex">
             <PublicLanguageSelector
@@ -423,6 +530,39 @@ export function PublicShell({
                   {item.label}
                 </Link>
               ))}
+              <section>
+                <button
+                  type="button"
+                  aria-controls="public-mobile-services-navigation"
+                  aria-expanded={mobileServicesOpen}
+                  className="wb-focus flex min-h-10 w-full items-center justify-between text-left text-lg font-medium"
+                  onClick={() => setMobileServicesOpen((isOpen) => !isOpen)}
+                >
+                  <span>{dictionary.servicesNav}</span>
+                  <span aria-hidden="true">{mobileServicesOpen ? "▴" : "▾"}</span>
+                </button>
+                {mobileServicesOpen ? (
+                  <div
+                    id="public-mobile-services-navigation"
+                    className="mt-2 ml-2 flex flex-col border-l border-[var(--wb-rule)] pl-3"
+                  >
+                    {serviceItems.map((item) => (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={item.current}
+                        className="wb-focus flex min-h-10 items-center text-base font-medium"
+                        onClick={() => {
+                          setMobileServicesOpen(false);
+                          setOpen(false);
+                        }}
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
+              </section>
               <a className="wb-focus mt-4 min-h-10 text-lg font-medium" href={WHATSAPP_CONTACT_URL}>
                 {dictionary.contact}
               </a>

@@ -93,6 +93,15 @@ describe("public shell during static prerendering", () => {
     expect(markup).toContain(dictionaries.fr.servicesNav);
   });
 
+  it("keeps Services as a direct overview link and gives its disclosure an accessible control", () => {
+    const markup = renderShell("en", "/en/services/audits", <main>Content</main>);
+
+    expect(markup).toContain('href="/en/services"');
+    expect(markup).toContain('aria-controls="public-desktop-services-navigation"');
+    expect(markup).toContain(`aria-label="${dictionaries.en.openServicesNav}"`);
+    expect(markup).toContain('aria-current="true"');
+  });
+
   it("links the header training destination to the localized catalogue overview", () => {
     const markup = renderShell("pt", "/pt", <main>Conteúdo</main>);
 

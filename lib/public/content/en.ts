@@ -16,6 +16,9 @@ export const en: PublicDictionary = {
   trainingsNav: "Training",
   aboutNav: "About",
   servicesNav: "Services",
+  allServicesNav: "All services",
+  openServicesNav: "Show Services pages",
+  closeServicesNav: "Hide Services pages",
   languageSelector: "Choose language",
   trainingCatalogue: {
     metaTitle: "Training",
