@@ -12,6 +12,15 @@ export type PublicTrainingTopicDto = {
   slug: string;
 };
 
+export type PublicTrainingCatalogueFilterKind = "domain" | "topic";
+
+/** An eligible requested-locale taxonomy label selected for the public catalogue. */
+export type PublicTrainingCatalogueFilter = {
+  kind: PublicTrainingCatalogueFilterKind;
+  name: string;
+  slug: string;
+};
+
 /**
  * Programme card. Domain and topic labels come from the requested locale's published
  * translations of the training's eligible ancestors; they are never taken from another locale.

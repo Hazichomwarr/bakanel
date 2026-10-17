@@ -21,6 +21,7 @@ import * as servicesOverviewRoute from "../app/(public)/[locale]/services/page";
 import { dictionaries } from "../lib/public/content";
 import { localizedPublicHref, publicLocales, type PublicLocale } from "../lib/public/locale";
 import { getServiceContent, serviceHref, serviceSlugs, servicesHref } from "../lib/public/services";
+import { localizedTrainingCatalogueHref } from "../lib/public/training-routes";
 
 // During `next build`, useSearchParams() throws a client-side-rendering bailout on a
 // statically prerendered route. Without a Suspense boundary that error aborts the export
@@ -112,6 +113,15 @@ describe("public shell during static prerendering", () => {
   it("preserves the localized catalogue route, query string, and hash while switching languages", () => {
     expect(localizedPublicHref("/fr/formations", "en", "page=2", "#programmes")).toBe(
       "/en/formations?page=2#programmes",
+    );
+  });
+
+  it("clears localized catalogue filters when switching languages", () => {
+    expect(
+      localizedTrainingCatalogueHref("/fr/formations", "en", "domain=assurance&page=2", "#cards"),
+    ).toBe("/en/formations");
+    expect(localizedTrainingCatalogueHref("/pt/formations", "fr", "page=2", "#cards")).toBe(
+      "/fr/formations?page=2#cards",
     );
   });
 

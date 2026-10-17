@@ -3,9 +3,10 @@ import { Prisma } from "@prisma/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const listPublicTrainings = vi.hoisted(() => vi.fn());
+const getPublicTrainingCatalogueFilter = vi.hoisted(() => vi.fn());
 
 vi.mock("@/lib/public/training.read", () => ({
-  publicTrainingReader: { listPublicTrainings },
+  publicTrainingReader: { getPublicTrainingCatalogueFilter, listPublicTrainings },
 }));
 
 import TrainingCataloguePage, { generateMetadata } from "../app/(public)/[locale]/formations/page";
@@ -21,10 +22,17 @@ const publishedTraining = {
   topic: { name: "Sinistres", slug: "sinistres" },
 };
 
-function routeProps(locale: string, page?: string | string[]) {
+function routeProps(
+  locale: string,
+  searchParams: {
+    domain?: string | string[];
+    page?: string | string[];
+    topic?: string | string[];
+  } = {},
+) {
   return {
     params: Promise.resolve({ locale }),
-    searchParams: Promise.resolve({ page }),
+    searchParams: Promise.resolve(searchParams),
   };
 }
 
@@ -32,8 +40,15 @@ function readableText(markup: string) {
   return markup.replaceAll("&#x27;", "'").replaceAll("&amp;", "&");
 }
 
-async function renderCatalogue(locale: string, page?: string | string[]) {
-  const pageComponent = await TrainingCataloguePage(routeProps(locale, page));
+async function renderCatalogue(
+  locale: string,
+  searchParams: {
+    domain?: string | string[];
+    page?: string | string[];
+    topic?: string | string[];
+  } = {},
+) {
+  const pageComponent = await TrainingCataloguePage(routeProps(locale, searchParams));
   return readableText(renderToStaticMarkup(pageComponent));
 }
 
@@ -47,6 +62,8 @@ function unreachableDatabaseError() {
 beforeEach(() => {
   listPublicTrainings.mockReset();
   listPublicTrainings.mockResolvedValue([]);
+  getPublicTrainingCatalogueFilter.mockReset();
+  getPublicTrainingCatalogueFilter.mockResolvedValue(null);
 });
 
 afterEach(() => {
@@ -91,16 +108,16 @@ describe("public training catalogue route", () => {
       { ...publishedTraining, slug: "programme-13", title: "Programme 13" },
     ]);
 
-    const markup = await renderCatalogue("en", "2");
+    const markup = await renderCatalogue("en", { page: "2" });
 
     expect(listPublicTrainings).toHaveBeenCalledWith("en", { offset: 12, limit: 13 });
     expect(markup).toContain('href="/en/formations?page=3"');
     expect(markup).toContain('href="/en/formations"');
 
-    await renderCatalogue("en", "2.5");
+    await renderCatalogue("en", { page: "2.5" });
     expect(listPublicTrainings).toHaveBeenLastCalledWith("en", { offset: 0, limit: 13 });
 
-    await renderCatalogue("en", ["2", "3"]);
+    await renderCatalogue("en", { page: ["2", "3"] });
     expect(listPublicTrainings).toHaveBeenLastCalledWith("en", { offset: 0, limit: 13 });
   });
 
@@ -113,7 +130,7 @@ describe("public training catalogue route", () => {
   });
 
   it("returns an empty later page to the first page instead of calling the catalogue empty", async () => {
-    await expect(TrainingCataloguePage(routeProps("fr", "2"))).rejects.toMatchObject({
+    await expect(TrainingCataloguePage(routeProps("fr", { page: "2" }))).rejects.toMatchObject({
       digest: expect.stringContaining("NEXT_REDIRECT"),
     });
     expect(listPublicTrainings).toHaveBeenCalledWith("fr", { offset: 12, limit: 13 });
@@ -134,6 +151,57 @@ describe("public training catalogue route", () => {
     expect(consoleError).not.toHaveBeenCalledWith(
       expect.stringMatching(/secret|postgres|db\.internal/),
     );
+  });
+
+  it("uses an eligible domain filter inside the reader query and retains it through pagination", async () => {
+    const filter = { kind: "domain" as const, slug: "assurance", name: "Assurance" };
+    getPublicTrainingCatalogueFilter.mockResolvedValue(filter);
+    listPublicTrainings.mockResolvedValue([
+      ...Array.from({ length: 12 }, (_, index) => ({
+        ...publishedTraining,
+        slug: `programme-${index + 1}`,
+        title: `Programme ${index + 1}`,
+      })),
+      { ...publishedTraining, slug: "programme-13", title: "Programme 13" },
+    ]);
+
+    const markup = await renderCatalogue("fr", { domain: "assurance", page: "2" });
+
+    expect(getPublicTrainingCatalogueFilter).toHaveBeenCalledWith("fr", {
+      kind: "domain",
+      slug: "assurance",
+    });
+    expect(listPublicTrainings).toHaveBeenCalledWith("fr", {
+      offset: 12,
+      limit: 13,
+      filter,
+    });
+    expect(markup).toContain("Filtré par:");
+    expect(markup).toContain("Domaine — Assurance");
+    expect(markup).toContain('href="/fr/formations?domain=assurance&page=3"');
+    expect(markup).toContain('href="/fr/formations?domain=assurance"');
+  });
+
+  it("fails closed for unknown or conflicting filters without exposing labels or querying programmes", async () => {
+    const unknownMarkup = await renderCatalogue("en", { topic: "unknown-topic" });
+
+    expect(getPublicTrainingCatalogueFilter).toHaveBeenCalledWith("en", {
+      kind: "topic",
+      slug: "unknown-topic",
+    });
+    expect(listPublicTrainings).not.toHaveBeenCalled();
+    expect(unknownMarkup).toContain(dictionaries.en.trainingCatalogue.filteredEmptyTitle);
+    expect(unknownMarkup).not.toContain("unknown-topic");
+
+    getPublicTrainingCatalogueFilter.mockClear();
+    const conflictingMarkup = await renderCatalogue("en", {
+      domain: "insurance",
+      topic: "claims",
+    });
+
+    expect(getPublicTrainingCatalogueFilter).not.toHaveBeenCalled();
+    expect(listPublicTrainings).not.toHaveBeenCalled();
+    expect(conflictingMarkup).toContain(dictionaries.en.trainingCatalogue.filteredEmptyDescription);
   });
 
   it("keeps the route locale-specific in metadata and complete in every supported locale", async () => {

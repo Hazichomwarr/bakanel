@@ -5,9 +5,12 @@ import { Prisma } from "@prisma/client";
 
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import { dictionaries } from "@/lib/public/content";
-import type { PublicTrainingDto } from "@/lib/public/dto";
+import type { PublicTrainingCatalogueFilter, PublicTrainingDto } from "@/lib/public/dto";
 import { isPublicLocale, publicLocales, publicHref, type PublicLocale } from "@/lib/public/locale";
-import { publicTrainingReader } from "@/lib/public/training.read";
+import {
+  publicTrainingReader,
+  type PublicTrainingCatalogueFilterInput,
+} from "@/lib/public/training.read";
 import { trainingCatalogueHref, trainingDetailHref } from "@/lib/public/training-routes";
 
 const PAGE_SIZE = 12;
@@ -15,12 +18,24 @@ const LOOKAHEAD_LIMIT = PAGE_SIZE + 1;
 
 type CataloguePageProps = {
   params: Promise<{ locale: string }>;
-  searchParams: Promise<{ page?: string | string[] }>;
+  searchParams: Promise<{
+    domain?: string | string[];
+    page?: string | string[];
+    topic?: string | string[];
+  }>;
 };
 
 type CatalogueResult =
-  | { status: "available"; trainings: PublicTrainingDto[]; hasNextPage: boolean }
+  | {
+      status: "available";
+      trainings: PublicTrainingDto[];
+      hasNextPage: boolean;
+      filter: PublicTrainingCatalogueFilter | null;
+    }
+  | { status: "filtered-empty" }
   | { status: "unavailable" };
+
+type CatalogueFilterRequest = PublicTrainingCatalogueFilterInput | "invalid" | null;
 
 function parsePage(value: string | string[] | undefined) {
   if (typeof value !== "string" || !/^[1-9]\d*$/.test(value)) {
@@ -31,9 +46,54 @@ function parsePage(value: string | string[] | undefined) {
   return Number.isSafeInteger(page) ? page : 1;
 }
 
-function catalogueHref(locale: PublicLocale, page: number) {
+function catalogueHref(
+  locale: PublicLocale,
+  page: number,
+  filter: PublicTrainingCatalogueFilterInput | null = null,
+) {
   const pathname = `${publicHref(locale)}/formations`;
-  return page === 1 ? pathname : `${pathname}?page=${page}`;
+  const searchParams = new URLSearchParams();
+
+  if (filter) {
+    searchParams.set(filter.kind, filter.slug);
+  }
+  if (page > 1) {
+    searchParams.set("page", String(page));
+  }
+
+  const query = searchParams.toString();
+  return query ? `${pathname}?${query}` : pathname;
+}
+
+/**
+ * Only one taxonomy scope may be selected at once. Supplying both query parameters is invalid
+ * and fails closed rather than letting either one silently override the other.
+ */
+function parseCatalogueFilter({
+  domain,
+  topic,
+}: {
+  domain: string | string[] | undefined;
+  topic: string | string[] | undefined;
+}): CatalogueFilterRequest {
+  if (domain !== undefined && topic !== undefined) {
+    return "invalid";
+  }
+
+  const selected = domain ?? topic;
+  if (selected === undefined) {
+    return null;
+  }
+  if (typeof selected !== "string") {
+    return "invalid";
+  }
+
+  const slug = selected.trim();
+  if (!slug) {
+    return "invalid";
+  }
+
+  return { kind: domain !== undefined ? "domain" : "topic", slug };
 }
 
 function isOperationalDatabaseError(error: unknown): error is Error {
@@ -52,17 +112,35 @@ function operationalErrorLabel(error: Error) {
   return error.name;
 }
 
-async function getCatalogue(locale: PublicLocale, page: number): Promise<CatalogueResult> {
+async function getCatalogue(
+  locale: PublicLocale,
+  page: number,
+  requestedFilter: CatalogueFilterRequest,
+): Promise<CatalogueResult> {
   try {
+    if (requestedFilter === "invalid") {
+      return { status: "filtered-empty" };
+    }
+
+    const filter = requestedFilter
+      ? await publicTrainingReader.getPublicTrainingCatalogueFilter(locale, requestedFilter)
+      : null;
+
+    if (requestedFilter && !filter) {
+      return { status: "filtered-empty" };
+    }
+
     const results = await publicTrainingReader.listPublicTrainings(locale, {
       offset: (page - 1) * PAGE_SIZE,
       limit: LOOKAHEAD_LIMIT,
+      ...(filter ? { filter } : {}),
     });
 
     return {
       status: "available",
       trainings: results.slice(0, PAGE_SIZE),
       hasNextPage: results.length > PAGE_SIZE,
+      filter,
     };
   } catch (error) {
     if (!isOperationalDatabaseError(error)) {
@@ -104,16 +182,17 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
     notFound();
   }
 
-  const { page: requestedPage } = await searchParams;
+  const { domain, page: requestedPage, topic } = await searchParams;
   const page = parsePage(requestedPage);
+  const requestedFilter = parseCatalogueFilter({ domain, topic });
   const dictionary = dictionaries[locale];
   const catalogue = dictionary.trainingCatalogue;
-  const result = await getCatalogue(locale, page);
+  const result = await getCatalogue(locale, page, requestedFilter);
 
   // A later page may become empty after concurrent archival or a stale shared link. Returning
   // visitors to the first page avoids presenting that bounded page as an empty catalogue.
   if (result.status === "available" && result.trainings.length === 0 && page > 1) {
-    redirect(catalogueHref(locale, 1));
+    redirect(catalogueHref(locale, 1, result.filter));
   }
 
   return (
@@ -134,6 +213,15 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
       <section className="mx-auto max-w-7xl px-5 py-20 sm:px-8 lg:py-28 xl:px-0">
         {result.status === "available" && result.trainings.length > 0 ? (
           <>
+            {result.filter ? (
+              <p className="mb-8 border-l-2 border-[var(--wb-green)] pl-5 text-sm leading-6 text-[var(--wb-muted)]">
+                {catalogue.filteredByLabel}:{" "}
+                <span className="font-medium text-[var(--wb-ink)]">
+                  {result.filter.kind === "domain" ? catalogue.domainLabel : catalogue.topicLabel} —{" "}
+                  {result.filter.name}
+                </span>
+              </p>
+            ) : null}
             <ul className="grid gap-px border border-[var(--wb-rule)] bg-[var(--wb-rule)] md:grid-cols-2 xl:grid-cols-3">
               {result.trainings.map((training) => (
                 <li
@@ -182,6 +270,7 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
               locale={locale}
               page={page}
               hasNextPage={result.hasNextPage}
+              filter={result.filter}
               previousLabel={catalogue.previousPage}
               nextLabel={catalogue.nextPage}
               pageLabel={catalogue.pageLabel}
@@ -191,12 +280,44 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
 
         {result.status === "available" && result.trainings.length === 0 ? (
           <div className="max-w-2xl border-l-2 border-[var(--wb-green)] pl-6">
+            {result.filter ? (
+              <p className="wb-kicker mb-5">
+                {catalogue.filteredByLabel}:{" "}
+                {result.filter.kind === "domain" ? catalogue.domainLabel : catalogue.topicLabel} —{" "}
+                {result.filter.name}
+              </p>
+            ) : null}
             <h2 className="wb-editorial text-4xl leading-tight font-medium">
-              {catalogue.emptyTitle}
+              {result.filter ? catalogue.filteredEmptyTitle : catalogue.emptyTitle}
             </h2>
             <p className="mt-5 text-lg leading-8 text-[var(--wb-muted)]">
-              {catalogue.emptyDescription}
+              {result.filter ? catalogue.filteredEmptyDescription : catalogue.emptyDescription}
             </p>
+            {result.filter ? (
+              <Link
+                className="wb-focus wb-text-link mt-6 inline-flex"
+                href={catalogueHref(locale, 1)}
+              >
+                {catalogue.allProgrammesLabel}
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+
+        {result.status === "filtered-empty" ? (
+          <div className="max-w-2xl border-l-2 border-[var(--wb-green)] pl-6">
+            <h2 className="wb-editorial text-4xl leading-tight font-medium">
+              {catalogue.filteredEmptyTitle}
+            </h2>
+            <p className="mt-5 text-lg leading-8 text-[var(--wb-muted)]">
+              {catalogue.filteredEmptyDescription}
+            </p>
+            <Link
+              className="wb-focus wb-text-link mt-6 inline-flex"
+              href={catalogueHref(locale, 1)}
+            >
+              {catalogue.allProgrammesLabel}
+            </Link>
           </div>
         ) : null}
 
@@ -239,6 +360,7 @@ function Pagination({
   locale,
   page,
   hasNextPage,
+  filter,
   previousLabel,
   nextLabel,
   pageLabel,
@@ -246,6 +368,7 @@ function Pagination({
   locale: PublicLocale;
   page: number;
   hasNextPage: boolean;
+  filter: PublicTrainingCatalogueFilter | null;
   previousLabel: string;
   nextLabel: string;
   pageLabel: string;
@@ -257,7 +380,7 @@ function Pagination({
   return (
     <nav className="mt-10 flex items-center justify-between gap-4" aria-label={pageLabel}>
       {page > 1 ? (
-        <Link className="wb-focus wb-text-link" href={catalogueHref(locale, page - 1)}>
+        <Link className="wb-focus wb-text-link" href={catalogueHref(locale, page - 1, filter)}>
           <span aria-hidden="true" className="mr-2">
             ←
           </span>
@@ -270,7 +393,7 @@ function Pagination({
         {pageLabel} {page}
       </span>
       {hasNextPage ? (
-        <Link className="wb-focus wb-text-link" href={catalogueHref(locale, page + 1)}>
+        <Link className="wb-focus wb-text-link" href={catalogueHref(locale, page + 1, filter)}>
           {nextLabel}
           <span aria-hidden="true" className="ml-2">
             →

@@ -6,15 +6,12 @@ import { Suspense, useEffect, useRef, useState } from "react";
 
 import { WHATSAPP_CONTACT_URL } from "@/lib/public/contact";
 import type { PublicDictionary } from "@/lib/public/content";
-import {
-  isPublicLocale,
-  localizedPublicHref,
-  publicHref,
-  publicLocales,
-  type PublicLocale,
-} from "@/lib/public/locale";
+import { isPublicLocale, publicHref, publicLocales, type PublicLocale } from "@/lib/public/locale";
 import { getServiceContent, serviceHref, serviceSlugs, servicesHref } from "@/lib/public/services";
-import { trainingCatalogueHref } from "@/lib/public/training-routes";
+import {
+  localizedTrainingCatalogueHref,
+  trainingCatalogueHref,
+} from "@/lib/public/training-routes";
 
 type NavigationItem = {
   href: string;
@@ -122,7 +119,7 @@ function selectorHref({
     return readTrainingLocaleTargets(pathname)?.[target] ?? trainingCatalogueHref(target);
   }
 
-  return localizedPublicHref(pathname, target, search, hash);
+  return localizedTrainingCatalogueHref(pathname, target, search, hash);
 }
 
 function LanguageSelector({

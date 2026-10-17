@@ -4,6 +4,8 @@ import type { Locale, Prisma, PrismaClient } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import type {
+  PublicTrainingCatalogueFilter,
+  PublicTrainingCatalogueFilterKind,
   PublicTrainingAlternateDto,
   PublicTrainingDetailDto,
   PublicTrainingDomainDto,
@@ -16,6 +18,11 @@ import { publicLocales, toPrismaLocale } from "./locale";
 
 const DEFAULT_PAGE_SIZE = 12;
 const MAX_PAGE_SIZE = 48;
+
+export type PublicTrainingCatalogueFilterInput = {
+  kind: PublicTrainingCatalogueFilterKind;
+  slug: string;
+};
 
 /**
  * Public catalogue order: domain display order, then topic display order, then training
@@ -70,6 +77,48 @@ function pageSize(requested?: number) {
 
 function offset(requested?: number) {
   return requested && Number.isInteger(requested) && requested > 0 ? requested : 0;
+}
+
+function normalizedSlug(value: string) {
+  return value.trim();
+}
+
+function publicTrainingFilterWhere(
+  locale: PublicLocale,
+  filter: PublicTrainingCatalogueFilterInput,
+): Prisma.TrainingWhereInput | null {
+  const prismaLocale = toPrismaLocale(locale);
+  const slug = normalizedSlug(filter.slug);
+
+  if (!slug) {
+    return null;
+  }
+
+  const translation = { some: { locale: prismaLocale, slug, isPublished: true } };
+
+  if (filter.kind === "domain") {
+    return {
+      trainingTopic: {
+        is: {
+          trainingDomain: {
+            is: {
+              ...publicDomainWhere(locale),
+              translations: translation,
+            },
+          },
+        },
+      },
+    };
+  }
+
+  return {
+    trainingTopic: {
+      is: {
+        ...publicTopicWhere(locale),
+        translations: translation,
+      },
+    },
+  };
 }
 
 /** A blank optional section is treated as missing so presentation can omit it. */
@@ -227,11 +276,25 @@ export function createPublicTrainingReader(client: PrismaClient) {
     },
     async listPublicTrainings(
       locale: PublicLocale,
-      options: { offset?: number; limit?: number } = {},
+      options: {
+        offset?: number;
+        limit?: number;
+        filter?: PublicTrainingCatalogueFilterInput;
+      } = {},
     ): Promise<PublicTrainingDto[]> {
       const prismaLocale = toPrismaLocale(locale);
+      const filterWhere = options.filter
+        ? publicTrainingFilterWhere(locale, options.filter)
+        : undefined;
+
+      if (options.filter && !filterWhere) {
+        return [];
+      }
+
       const trainings = await client.training.findMany({
-        where: publicTrainingWhere(locale),
+        where: filterWhere
+          ? { AND: [publicTrainingWhere(locale), filterWhere] }
+          : publicTrainingWhere(locale),
         select: trainingCardSelect({ locale: prismaLocale, isPublished: true }, prismaLocale),
         orderBy: PUBLIC_TRAINING_ORDER,
         skip: offset(options.offset),
@@ -242,6 +305,45 @@ export function createPublicTrainingReader(client: PrismaClient) {
         const dto = toPublicTrainingDto(training);
         return dto ? [dto] : [];
       });
+    },
+    async getPublicTrainingCatalogueFilter(
+      locale: PublicLocale,
+      filter: PublicTrainingCatalogueFilterInput,
+    ): Promise<PublicTrainingCatalogueFilter | null> {
+      const prismaLocale = toPrismaLocale(locale);
+      const slug = normalizedSlug(filter.slug);
+
+      if (!slug) {
+        return null;
+      }
+
+      const translationWhere = { locale: prismaLocale, slug, isPublished: true };
+      const select = {
+        translations: {
+          where: translationWhere,
+          select: { name: true, slug: true },
+          take: 1,
+        },
+      };
+      const item =
+        filter.kind === "domain"
+          ? await client.trainingDomain.findFirst({
+              where: {
+                ...publicDomainWhere(locale),
+                translations: { some: translationWhere },
+              },
+              select,
+            })
+          : await client.trainingTopic.findFirst({
+              where: {
+                ...publicTopicWhere(locale),
+                translations: { some: translationWhere },
+              },
+              select,
+            });
+      const translation = item?.translations[0];
+
+      return translation ? { kind: filter.kind, ...translation } : null;
     },
     async getPublicTrainingBySlug(
       locale: PublicLocale,

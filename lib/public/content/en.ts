@@ -36,6 +36,11 @@ export const en: PublicDictionary = {
     enquiryLabel: "Contact us about this training",
     emptyTitle: "No training is published at the moment.",
     emptyDescription: "New published programmes will appear here.",
+    filteredEmptyTitle: "No published training matches this selection.",
+    filteredEmptyDescription:
+      "This selection is unavailable or does not currently offer a published programme in this language.",
+    filteredByLabel: "Filtered by",
+    allProgrammesLabel: "View all training programmes",
     unavailableTitle: "The catalogue is temporarily unavailable.",
     unavailableDescription: "Please try again later or contact our team on WhatsApp.",
     previousPage: "Previous",

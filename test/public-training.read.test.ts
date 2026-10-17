@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
-import { publicTrainingWhere } from "../lib/public/eligibility";
+import { publicDomainWhere, publicTrainingWhere } from "../lib/public/eligibility";
 import type { PublicLocale } from "../lib/public/locale";
 import { createPublicTrainingReader } from "../lib/public/training.read";
 
@@ -16,8 +16,8 @@ const expectedCatalogueOrder = [
   { id: "asc" },
 ];
 
-function readerWith(training: Record<string, unknown>) {
-  return createPublicTrainingReader({ training } as unknown as PrismaClient);
+function readerWith(training: Record<string, unknown>, taxonomy: Record<string, unknown> = {}) {
+  return createPublicTrainingReader({ training, ...taxonomy } as unknown as PrismaClient);
 }
 
 /** A selected row as Prisma would return it, plus stray private fields that must not leak. */
@@ -57,6 +57,81 @@ describe("public training list reader", () => {
         where: publicTrainingWhere("en"),
       }),
     );
+  });
+
+  it("applies a requested-locale domain filter inside the database query before pagination", async () => {
+    const training = { findMany: vi.fn().mockResolvedValue([]) };
+
+    await readerWith(training).listPublicTrainings("fr", {
+      filter: { kind: "domain", slug: "assurance" },
+      offset: 12,
+      limit: 13,
+    });
+
+    expect(training.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skip: 12,
+        take: 13,
+        where: {
+          AND: [
+            publicTrainingWhere("fr"),
+            {
+              trainingTopic: {
+                is: {
+                  trainingDomain: {
+                    is: {
+                      ...publicDomainWhere("fr"),
+                      translations: {
+                        some: { locale: "FR", slug: "assurance", isPublished: true },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          ],
+        },
+      }),
+    );
+  });
+
+  it("fails closed for a blank requested filter instead of broadening the query", async () => {
+    const training = { findMany: vi.fn() };
+
+    await expect(
+      readerWith(training).listPublicTrainings("fr", {
+        filter: { kind: "topic", slug: "   " },
+      }),
+    ).resolves.toEqual([]);
+    expect(training.findMany).not.toHaveBeenCalled();
+  });
+
+  it("resolves an active label only from an eligible requested-locale taxonomy translation", async () => {
+    const training = { findMany: vi.fn() };
+    const trainingDomain = {
+      findFirst: vi.fn().mockResolvedValue({
+        translations: [{ name: "Assurance", slug: "assurance" }],
+      }),
+    };
+    const trainingTopic = { findFirst: vi.fn() };
+    const reader = readerWith(training, { trainingDomain, trainingTopic });
+
+    await expect(
+      reader.getPublicTrainingCatalogueFilter("fr", { kind: "domain", slug: "assurance" }),
+    ).resolves.toEqual({ kind: "domain", name: "Assurance", slug: "assurance" });
+    expect(trainingDomain.findFirst).toHaveBeenCalledWith({
+      where: {
+        ...publicDomainWhere("fr"),
+        translations: { some: { locale: "FR", slug: "assurance", isPublished: true } },
+      },
+      select: {
+        translations: {
+          where: { locale: "FR", slug: "assurance", isPublished: true },
+          select: { name: true, slug: true },
+          take: 1,
+        },
+      },
+    });
   });
 
   it("selects taxonomy labels only from the requested locale's published translations", async () => {

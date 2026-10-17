@@ -36,6 +36,11 @@ export const fr: PublicDictionary = {
     enquiryLabel: "Nous contacter à propos de cette formation",
     emptyTitle: "Aucune formation publiée pour le moment.",
     emptyDescription: "Les prochains programmes publiés apparaîtront ici.",
+    filteredEmptyTitle: "Aucune formation publiée ne correspond à cette sélection.",
+    filteredEmptyDescription:
+      "Cette sélection est indisponible ou ne propose actuellement aucun programme publié dans cette langue.",
+    filteredByLabel: "Filtré par",
+    allProgrammesLabel: "Voir toutes les formations",
     unavailableTitle: "Le catalogue est momentanément indisponible.",
     unavailableDescription: "Veuillez réessayer plus tard ou contacter notre équipe sur WhatsApp.",
     previousPage: "Précédent",

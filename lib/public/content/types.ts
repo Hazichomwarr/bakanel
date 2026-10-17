@@ -57,6 +57,10 @@ export type TrainingCatalogueDictionary = {
   enquiryLabel: string;
   emptyTitle: string;
   emptyDescription: string;
+  filteredEmptyTitle: string;
+  filteredEmptyDescription: string;
+  filteredByLabel: string;
+  allProgrammesLabel: string;
   unavailableTitle: string;
   unavailableDescription: string;
   previousPage: string;

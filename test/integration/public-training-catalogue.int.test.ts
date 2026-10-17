@@ -31,6 +31,7 @@ async function createPublishedTaxonomy(
     domainDisplayOrder?: number;
     topicDisplayOrder?: number;
     domainStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
+    topicStatus?: "DRAFT" | "PUBLISHED" | "ARCHIVED";
     publishedLocales?: Array<"FR" | "EN" | "PT">;
     unpublishedTopicLocales?: Array<"FR" | "EN" | "PT">;
     unpublishedDomainLocales?: Array<"FR" | "EN" | "PT">;
@@ -48,6 +49,7 @@ async function createPublishedTaxonomy(
   });
   const topic = await createTopic(client, {
     trainingDomainId: domain.id,
+    status: options.topicStatus,
     displayOrder: options.topicDisplayOrder,
     translations: locales.map((locale) => ({
       locale,
@@ -282,6 +284,132 @@ describe("public catalogue ordering against PostgreSQL", () => {
       "it-home-50",
       "it-home-60",
     ]);
+  });
+});
+
+describe("public catalogue taxonomy filters against PostgreSQL", () => {
+  it("filters eligible requested-locale domains and topics before pagination", async () => {
+    const filtered = await createPublishedTaxonomy("filter", {
+      publishedLocales: ["FR", "EN", "PT"],
+    });
+    const other = await createPublishedTaxonomy("other", { publishedLocales: ["FR"] });
+
+    for (const slug of ["one", "two", "three"]) {
+      await createTraining(client, {
+        trainingTopicId: filtered.topic.id,
+        translations: [
+          { locale: "FR", slug: `filter-${slug}-fr` },
+          { locale: "EN", slug: `filter-${slug}-en` },
+          { locale: "PT", slug: `filter-${slug}-pt` },
+        ],
+      });
+    }
+    await createTraining(client, {
+      trainingTopicId: filtered.topic.id,
+      status: "ARCHIVED",
+      translations: [{ locale: "FR", slug: "filter-archived" }],
+    });
+    await createTraining(client, {
+      trainingTopicId: filtered.topic.id,
+      translations: [{ locale: "FR", slug: "filter-unpublished", isPublished: false }],
+    });
+    await createTraining(client, {
+      trainingTopicId: other.topic.id,
+      translations: [{ locale: "FR", slug: "other" }],
+    });
+
+    const domainFilter = { kind: "domain" as const, slug: "it-filter-domain-fr" };
+    const topicFilter = { kind: "topic" as const, slug: "it-filter-topic-fr" };
+
+    await expect(reader.getPublicTrainingCatalogueFilter("fr", domainFilter)).resolves.toEqual({
+      kind: "domain",
+      name: "it-filter-domain-fr",
+      slug: "it-filter-domain-fr",
+    });
+    await expect(reader.getPublicTrainingCatalogueFilter("fr", topicFilter)).resolves.toEqual({
+      kind: "topic",
+      name: "it-filter-topic-fr",
+      slug: "it-filter-topic-fr",
+    });
+    const firstDomainPage = await reader.listPublicTrainings("fr", {
+      filter: domainFilter,
+      limit: 2,
+    });
+    const secondDomainPage = await reader.listPublicTrainings("fr", {
+      filter: domainFilter,
+      offset: 2,
+      limit: 2,
+    });
+
+    expect(firstDomainPage).toHaveLength(2);
+    expect(secondDomainPage).toHaveLength(1);
+    expect(
+      [...firstDomainPage, ...secondDomainPage].map((training) => training.slug).sort(),
+    ).toEqual(["it-filter-one-fr", "it-filter-three-fr", "it-filter-two-fr"]);
+    await expect(reader.listPublicTrainings("fr", { filter: topicFilter })).resolves.toHaveLength(
+      3,
+    );
+  });
+
+  it("fails closed for unavailable taxonomy filters and isolates localized slugs", async () => {
+    const published = await createPublishedTaxonomy("localized-filter", {
+      publishedLocales: ["FR", "EN", "PT"],
+    });
+    const draftDomain = await createPublishedTaxonomy("draft-domain-filter", {
+      domainStatus: "DRAFT",
+      publishedLocales: ["FR"],
+    });
+    const draftTopic = await createPublishedTaxonomy("draft-topic-filter", {
+      topicStatus: "DRAFT",
+      publishedLocales: ["FR"],
+    });
+    await createTraining(client, {
+      trainingTopicId: published.topic.id,
+      translations: [
+        { locale: "FR", slug: "localized-fr" },
+        { locale: "EN", slug: "localized-en" },
+        { locale: "PT", slug: "localized-pt" },
+      ],
+    });
+    await createTraining(client, {
+      trainingTopicId: draftDomain.topic.id,
+      translations: [{ locale: "FR", slug: "hidden-domain" }],
+    });
+    await createTraining(client, {
+      trainingTopicId: draftTopic.topic.id,
+      translations: [{ locale: "FR", slug: "hidden-topic" }],
+    });
+
+    await expect(
+      reader.listPublicTrainings("en", {
+        filter: { kind: "domain", slug: "it-localized-filter-domain-fr" },
+      }),
+    ).resolves.toEqual([]);
+    await expect(
+      reader.listPublicTrainings("en", {
+        filter: { kind: "domain", slug: "it-localized-filter-domain-en" },
+      }),
+    ).resolves.toEqual([expect.objectContaining({ slug: "it-localized-en" })]);
+    await expect(
+      reader.listPublicTrainings("pt", {
+        filter: { kind: "topic", slug: "it-localized-filter-topic-pt" },
+      }),
+    ).resolves.toEqual([expect.objectContaining({ slug: "it-localized-pt" })]);
+    await expect(
+      reader.getPublicTrainingCatalogueFilter("fr", {
+        kind: "domain",
+        slug: "it-draft-domain-filter-domain-fr",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      reader.getPublicTrainingCatalogueFilter("fr", {
+        kind: "topic",
+        slug: "it-draft-topic-filter-topic-fr",
+      }),
+    ).resolves.toBeNull();
+    await expect(
+      reader.getPublicTrainingCatalogueFilter("pt", { kind: "topic", slug: "unknown" }),
+    ).resolves.toBeNull();
   });
 });
 
