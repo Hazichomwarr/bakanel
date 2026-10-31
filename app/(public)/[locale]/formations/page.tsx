@@ -222,11 +222,11 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
                 </span>
               </p>
             ) : null}
-            <ul className="grid gap-px border border-[var(--wb-rule)] bg-[var(--wb-rule)] md:grid-cols-2 xl:grid-cols-3">
+            <ul className="grid gap-px md:grid-cols-2 xl:grid-cols-3">
               {result.trainings.map((training) => (
                 <li
                   key={training.slug}
-                  className="flex min-w-0 flex-col bg-[var(--wb-paper)] p-6 sm:p-8"
+                  className="flex min-w-0 flex-col bg-[var(--wb-paper)] p-6 shadow-[0_0_0_1px_var(--wb-rule)] sm:p-8"
                 >
                   <p className="wb-kicker">{catalogue.programmeLabel}</p>
                   <h2 className="mt-7 break-words text-3xl leading-tight font-medium tracking-tight text-[var(--wb-green-deep)]">

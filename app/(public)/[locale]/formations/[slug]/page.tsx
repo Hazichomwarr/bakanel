@@ -227,7 +227,7 @@ export default async function TrainingDetailPage({ params }: TrainingDetailPageP
           </p>
 
           {sessions.status === "available" && sessions.sessions.length > 0 ? (
-            <ul className="mt-12 grid gap-px border border-[var(--wb-rule)] bg-[var(--wb-rule)] lg:grid-cols-2">
+            <ul className="mt-12 grid gap-px lg:grid-cols-2">
               {sessions.sessions.map((session, index) => {
                 const delivery = formatPublicSessionDelivery(session, detail);
                 const price = formatPublicSessionPrice(locale, session, detail);
@@ -235,7 +235,7 @@ export default async function TrainingDetailPage({ params }: TrainingDetailPageP
                 return (
                   <li
                     key={`${session.trainingSlug}-${session.startDate.toISOString()}-${index}`}
-                    className="bg-[var(--wb-paper)] p-6 sm:p-8"
+                    className="bg-[var(--wb-paper)] p-6 shadow-[0_0_0_1px_var(--wb-rule)] sm:p-8"
                   >
                     <dl className="grid gap-6 text-sm leading-6 sm:grid-cols-2">
                       <SessionFact

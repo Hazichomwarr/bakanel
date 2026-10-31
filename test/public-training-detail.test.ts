@@ -168,6 +168,18 @@ describe("public programme detail route", () => {
     expect(markup).toContain(`href="${WHATSAPP_CONTACT_URL}"`);
   });
 
+  it("uses occupied-session separators without a coloured grid background for incomplete rows", async () => {
+    listPublicUpcomingSessionsForTraining.mockResolvedValue([openSession]);
+
+    const markup = await renderDetail();
+
+    expect(markup).toContain('class="mt-12 grid gap-px lg:grid-cols-2"');
+    expect(markup).toContain("shadow-[0_0_0_1px_var(--wb-rule)]");
+    expect(markup).not.toContain(
+      "mt-12 grid gap-px border border-[var(--wb-rule)] bg-[var(--wb-rule)] lg:grid-cols-2",
+    );
+  });
+
   it("keeps a programme page useful when no upcoming public sessions exist", async () => {
     const markup = await renderDetail("pt");
 

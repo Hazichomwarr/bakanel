@@ -98,6 +98,18 @@ describe("public training catalogue route", () => {
     );
   });
 
+  it("uses occupied-card separators without a coloured grid background for incomplete rows", async () => {
+    listPublicTrainings.mockResolvedValue([publishedTraining]);
+
+    const markup = await renderCatalogue("fr");
+
+    expect(markup).toContain('class="grid gap-px md:grid-cols-2 xl:grid-cols-3"');
+    expect(markup).toContain("shadow-[0_0_0_1px_var(--wb-rule)]");
+    expect(markup).not.toContain(
+      "grid gap-px border border-[var(--wb-rule)] bg-[var(--wb-rule)] md:grid-cols-2",
+    );
+  });
+
   it("uses a bounded lookahead and validated server-side page value", async () => {
     listPublicTrainings.mockResolvedValue([
       ...Array.from({ length: 12 }, (_, index) => ({
