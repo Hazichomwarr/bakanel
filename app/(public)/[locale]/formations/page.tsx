@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { Prisma } from "@prisma/client";
@@ -112,6 +113,108 @@ function operationalErrorLabel(error: Error) {
   return error.name;
 }
 
+function TrainingCard({
+  catalogue,
+  featured,
+  locale,
+  training,
+}: {
+  catalogue: (typeof dictionaries)[PublicLocale]["trainingCatalogue"];
+  featured: boolean;
+  locale: PublicLocale;
+  training: PublicTrainingDto;
+}) {
+  const programmeLink = (
+    <Link className="wb-focus wb-text-link" href={trainingDetailHref(locale, training.slug)}>
+      {catalogue.detailLabel}
+      <span aria-hidden="true" className="ml-2">
+        →
+      </span>
+    </Link>
+  );
+  const enquiryLink = (
+    <a
+      className="wb-focus wb-text-link"
+      href={WHATSAPP_CONTACT_URL}
+      aria-label={`${catalogue.enquiryLabel}: ${training.title}`}
+    >
+      {catalogue.enquiryLabel}
+    </a>
+  );
+
+  if (featured) {
+    return (
+      <li className="overflow-hidden bg-[var(--wb-paper)] shadow-[0_0_0_1px_var(--wb-rule)]">
+        <article className="grid md:grid-cols-[minmax(0,1.25fr)_minmax(15rem,0.75fr)]">
+          <div className="flex min-w-0 flex-col p-6 sm:p-8 lg:p-10">
+            <p className="wb-kicker">{catalogue.programmeLabel}</p>
+            <h2 className="mt-7 break-words text-3xl leading-tight font-medium tracking-tight text-[var(--wb-green-deep)] sm:text-4xl">
+              {training.title}
+            </h2>
+            {training.summary ? (
+              <p className="mt-5 max-w-2xl leading-7 text-[var(--wb-muted)]">{training.summary}</p>
+            ) : null}
+            <div className="mt-auto flex flex-wrap gap-x-6 gap-y-4 pt-8">
+              {programmeLink}
+              {enquiryLink}
+            </div>
+          </div>
+          <aside className="relative flex min-h-56 overflow-hidden bg-[var(--wb-green-deep)] p-6 text-white sm:p-8">
+            <div
+              aria-hidden="true"
+              className="absolute -right-5 -bottom-7 h-40 w-40 overflow-hidden opacity-30 mix-blend-screen"
+            >
+              <Image
+                src="/images/logo.png"
+                alt=""
+                fill
+                sizes="10rem"
+                className="scale-150 object-cover object-top"
+              />
+            </div>
+            <dl className="relative z-10 mt-auto space-y-5 text-sm leading-6">
+              <div>
+                <dt className="wb-kicker text-[#c9d8c8] uppercase">{catalogue.domainLabel}</dt>
+                <dd className="mt-1 text-lg">{training.domain.name}</dd>
+              </div>
+              <div>
+                <dt className="wb-kicker text-[#c9d8c8] uppercase">{catalogue.topicLabel}</dt>
+                <dd className="mt-1 text-lg">{training.topic.name}</dd>
+              </div>
+            </dl>
+          </aside>
+        </article>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex min-w-0 flex-col bg-[var(--wb-paper)] p-6 shadow-[0_0_0_1px_var(--wb-rule)] sm:p-8">
+      <p className="wb-kicker">{catalogue.programmeLabel}</p>
+      <h2 className="mt-7 break-words text-3xl leading-tight font-medium tracking-tight text-[var(--wb-green-deep)]">
+        {training.title}
+      </h2>
+      {training.summary ? (
+        <p className="mt-5 leading-7 text-[var(--wb-muted)]">{training.summary}</p>
+      ) : null}
+      <dl className="mt-8 space-y-4 border-t border-[var(--wb-rule)] pt-6 text-sm leading-6">
+        <div>
+          <dt className="wb-kicker uppercase">{catalogue.domainLabel}</dt>
+          <dd className="mt-1 text-[var(--wb-ink)]">{training.domain.name}</dd>
+        </div>
+        <div>
+          <dt className="wb-kicker uppercase">{catalogue.topicLabel}</dt>
+          <dd className="mt-1 text-[var(--wb-ink)]">{training.topic.name}</dd>
+        </div>
+      </dl>
+      <div className="mt-auto flex flex-wrap gap-x-6 gap-y-4 pt-8">
+        {programmeLink}
+        {enquiryLink}
+      </div>
+    </li>
+  );
+}
+
 async function getCatalogue(
   locale: PublicLocale,
   page: number,
@@ -222,48 +325,21 @@ export default async function TrainingCataloguePage({ params, searchParams }: Ca
                 </span>
               </p>
             ) : null}
-            <ul className="grid gap-px md:grid-cols-2 xl:grid-cols-3">
+            <ul
+              className={
+                result.trainings.length === 1
+                  ? "max-w-5xl"
+                  : "grid gap-px md:grid-cols-2 xl:grid-cols-3"
+              }
+            >
               {result.trainings.map((training) => (
-                <li
+                <TrainingCard
                   key={training.slug}
-                  className="flex min-w-0 flex-col bg-[var(--wb-paper)] p-6 shadow-[0_0_0_1px_var(--wb-rule)] sm:p-8"
-                >
-                  <p className="wb-kicker">{catalogue.programmeLabel}</p>
-                  <h2 className="mt-7 break-words text-3xl leading-tight font-medium tracking-tight text-[var(--wb-green-deep)]">
-                    {training.title}
-                  </h2>
-                  {training.summary ? (
-                    <p className="mt-5 leading-7 text-[var(--wb-muted)]">{training.summary}</p>
-                  ) : null}
-                  <dl className="mt-8 space-y-4 border-t border-[var(--wb-rule)] pt-6 text-sm leading-6">
-                    <div>
-                      <dt className="wb-kicker uppercase">{catalogue.domainLabel}</dt>
-                      <dd className="mt-1 text-[var(--wb-ink)]">{training.domain.name}</dd>
-                    </div>
-                    <div>
-                      <dt className="wb-kicker uppercase">{catalogue.topicLabel}</dt>
-                      <dd className="mt-1 text-[var(--wb-ink)]">{training.topic.name}</dd>
-                    </div>
-                  </dl>
-                  <div className="mt-auto flex flex-wrap gap-x-6 gap-y-4 pt-8">
-                    <Link
-                      className="wb-focus wb-text-link"
-                      href={trainingDetailHref(locale, training.slug)}
-                    >
-                      {catalogue.detailLabel}
-                      <span aria-hidden="true" className="ml-2">
-                        →
-                      </span>
-                    </Link>
-                    <a
-                      className="wb-focus wb-text-link"
-                      href={WHATSAPP_CONTACT_URL}
-                      aria-label={`${catalogue.enquiryLabel}: ${training.title}`}
-                    >
-                      {catalogue.enquiryLabel}
-                    </a>
-                  </div>
-                </li>
+                  catalogue={catalogue}
+                  featured={result.trainings.length === 1}
+                  locale={locale}
+                  training={training}
+                />
               ))}
             </ul>
             <Pagination

@@ -99,7 +99,10 @@ describe("public training catalogue route", () => {
   });
 
   it("uses occupied-card separators without a coloured grid background for incomplete rows", async () => {
-    listPublicTrainings.mockResolvedValue([publishedTraining]);
+    listPublicTrainings.mockResolvedValue([
+      publishedTraining,
+      { ...publishedTraining, slug: "second-programme", title: "Second programme" },
+    ]);
 
     const markup = await renderCatalogue("fr");
 
@@ -108,6 +111,28 @@ describe("public training catalogue route", () => {
     expect(markup).not.toContain(
       "grid gap-px border border-[var(--wb-rule)] bg-[var(--wb-rule)] md:grid-cols-2",
     );
+  });
+
+  it("uses one restrained branded companion panel only for a single published programme", async () => {
+    listPublicTrainings.mockResolvedValue([publishedTraining]);
+
+    const singleProgrammeMarkup = await renderCatalogue("fr");
+
+    expect(singleProgrammeMarkup).toContain('class="max-w-5xl"');
+    expect(singleProgrammeMarkup).toContain('src="/_next/image?url=%2Fimages%2Flogo.png');
+    expect(singleProgrammeMarkup).toContain('aria-hidden="true"');
+    expect(singleProgrammeMarkup).toContain(publishedTraining.domain.name);
+    expect(singleProgrammeMarkup).toContain(publishedTraining.topic.name);
+
+    listPublicTrainings.mockResolvedValue([
+      publishedTraining,
+      { ...publishedTraining, slug: "second-programme", title: "Second programme" },
+    ]);
+
+    const multiProgrammeMarkup = await renderCatalogue("fr");
+
+    expect(multiProgrammeMarkup).toContain('class="grid gap-px md:grid-cols-2 xl:grid-cols-3"');
+    expect(multiProgrammeMarkup).not.toContain('src="/_next/image?url=%2Fimages%2Flogo.png');
   });
 
   it("uses a bounded lookahead and validated server-side page value", async () => {
