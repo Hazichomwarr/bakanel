@@ -10,10 +10,11 @@ import {
 
 import { prisma } from "@/lib/prisma";
 
+import { MAX_BROCHURE_SIZE_BYTES } from "./session-brochure.constants";
 import { TrainingSessionBrochureDomainError } from "./training-session-brochure.errors";
 
 const MUTABLE_SESSION_STATUSES = [SessionStatus.DRAFT, SessionStatus.OPEN, SessionStatus.CLOSED];
-const MAX_BROCHURE_SIZE_BYTES = 10 * 1024 * 1024;
+export { MAX_BROCHURE_SIZE_BYTES } from "./session-brochure.constants";
 
 type TransactionClient = Prisma.TransactionClient;
 
