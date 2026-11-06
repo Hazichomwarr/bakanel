@@ -9,6 +9,7 @@ export const FIXTURE_PREFIX = "it-";
 // application tables in the disposable database are ever truncated.
 const APPLICATION_TABLES = [
   "TrainingSessionExpert",
+  "TrainingSessionBrochure",
   "TrainingSession",
   "TrainingTranslation",
   "Training",
