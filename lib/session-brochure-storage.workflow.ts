@@ -27,6 +27,19 @@ type BrochureDomainService = {
   listBrochureHistory(sessionId: string): Promise<BrochureVersion[]>;
 };
 
+type BrochureAuthorizationService = {
+  validate(input: {
+    adminUserId: string;
+    sessionId: string;
+    pendingBrochureId: string;
+    secret: string;
+  }): Promise<unknown>;
+  finalize(
+    input: { adminUserId: string; sessionId: string; pendingBrochureId: string; secret: string },
+    verified: VerifiedPrivateBrochureObject,
+  ): Promise<BrochureVersion>;
+};
+
 function verificationMismatch(message: string): never {
   throw new SessionBrochureStorageError("BROCHURE_VERIFICATION_MISMATCH", message);
 }
@@ -49,8 +62,32 @@ function assertVerifiedMetadata(pending: BrochureVersion, object: VerifiedPrivat
 export function createSessionBrochureStorageWorkflow(
   storage: PrivateBrochureStorage,
   brochures: BrochureDomainService,
+  authorizations?: BrochureAuthorizationService,
 ) {
   return {
+    async finalizeAuthorizedUpload(input: {
+      adminUserId: string;
+      sessionId: string;
+      pendingBrochureId: string;
+      secret: string;
+    }) {
+      if (!authorizations)
+        throw new SessionBrochureStorageError(
+          "STORAGE_CONFIGURATION_INVALID",
+          "Brochure authorization is unavailable.",
+        );
+      await authorizations.validate(input);
+      const history = await brochures.listBrochureHistory(input.sessionId);
+      const pending = history.find(
+        (item) =>
+          item.id === input.pendingBrochureId &&
+          item.state === TrainingSessionBrochureState.PENDING,
+      );
+      if (!pending) verificationMismatch("The pending brochure version was not found.");
+      const verified = await storage.verifyUploadedObject(pending.storageKey);
+      assertVerifiedMetadata(pending, verified);
+      return authorizations.finalize(input, verified);
+    },
     async preparePendingUpload(
       sessionId: string,
       input: Omit<RegisterPendingBrochureInput, "storageKey" | "storageProvider">,

@@ -47,6 +47,11 @@ enum TrainingSessionBrochureState {
   REMOVED
 }
 
+enum BrochureUploadAttemptKind {
+  ISSUE
+  FINALIZE
+}
+
 enum ExpertStatus {
   ACTIVE
   INACTIVE
@@ -177,28 +182,29 @@ model TrainingTranslation {
 }
 
 model TrainingSession {
-  id                   String                    @id @default(uuid()) @db.Uuid
-  trainingId           String                    @db.Uuid
-  status               SessionStatus             @default(DRAFT)
-  startDate            DateTime                  @db.Date
+  id                           String                                       @id @default(uuid()) @db.Uuid
+  trainingId                   String                                       @db.Uuid
+  status                       SessionStatus                                @default(DRAFT)
+  startDate                    DateTime                                     @db.Date
   /// Future domain services enforce endDate >= startDate and a registration deadline coherent with the session start date.
-  endDate              DateTime                  @db.Date
-  registrationDeadline DateTime?                 @db.Date
-  deliveryMode         DeliveryMode
+  endDate                      DateTime                                     @db.Date
+  registrationDeadline         DateTime?                                    @db.Date
+  deliveryMode                 DeliveryMode
   /// When present, ISO 3166-1 alpha-2 country code (for example BF, AO, TD, CI), never a translated country name; validate in domain services.
-  country              String?
-  city                 String?
-  venue                String?
-  pricingMode          PricingMode
-  price                Decimal?                  @db.Decimal(18, 2)
+  country                      String?
+  city                         String?
+  venue                        String?
+  pricingMode                  PricingMode
+  price                        Decimal?                                     @db.Decimal(18, 2)
   /// When present, canonical ISO 4217 code. Store West African CFA franc as XOF; UI presentation renders it as CFA.
-  currency             String?                   @db.VarChar(3)
-  capacity             Int?
-  createdAt            DateTime                  @default(now())
-  updatedAt            DateTime                  @updatedAt
-  training             Training                  @relation(fields: [trainingId], references: [id], onDelete: Restrict)
-  expertAssignments    TrainingSessionExpert[]
-  brochures            TrainingSessionBrochure[]
+  currency                     String?                                      @db.VarChar(3)
+  capacity                     Int?
+  createdAt                    DateTime                                     @default(now())
+  updatedAt                    DateTime                                     @updatedAt
+  training                     Training                                     @relation(fields: [trainingId], references: [id], onDelete: Restrict)
+  expertAssignments            TrainingSessionExpert[]
+  brochures                    TrainingSessionBrochure[]
+  brochureUploadAuthorizations TrainingSessionBrochureUploadAuthorization[]
 
   @@index([trainingId, status, startDate])
 }
@@ -206,23 +212,57 @@ model TrainingSession {
 /// Immutable metadata history for externally stored session brochures. Only one row may be
 /// ACTIVE for a session; PostgreSQL enforces that partial uniqueness in the migration.
 model TrainingSessionBrochure {
-  id                String                       @id @default(uuid()) @db.Uuid
-  trainingSessionId String                       @db.Uuid
-  storageProvider   BrochureStorageProvider
-  storageKey        String                       @unique
-  originalFilename  String
-  mimeType          String
-  byteSize          Int
-  sha256            String
-  state             TrainingSessionBrochureState @default(PENDING)
-  createdAt         DateTime                     @default(now())
-  activatedAt       DateTime?
-  replacedAt        DateTime?
-  removedAt         DateTime?
-  storageDeletedAt  DateTime?
-  trainingSession   TrainingSession              @relation(fields: [trainingSessionId], references: [id], onDelete: Restrict)
+  id                  String                                      @id @default(uuid()) @db.Uuid
+  trainingSessionId   String                                      @db.Uuid
+  storageProvider     BrochureStorageProvider
+  storageKey          String                                      @unique
+  originalFilename    String
+  mimeType            String
+  byteSize            Int
+  sha256              String
+  state               TrainingSessionBrochureState                @default(PENDING)
+  createdAt           DateTime                                    @default(now())
+  activatedAt         DateTime?
+  replacedAt          DateTime?
+  removedAt           DateTime?
+  storageDeletedAt    DateTime?
+  trainingSession     TrainingSession                             @relation(fields: [trainingSessionId], references: [id], onDelete: Restrict)
+  uploadAuthorization TrainingSessionBrochureUploadAuthorization?
 
   @@index([trainingSessionId, state, createdAt])
+}
+
+/// One administrator-bound authorization per pending version; only a bearer-secret digest is stored.
+model TrainingSessionBrochureUploadAuthorization {
+  id                       String                  @id @default(uuid()) @db.Uuid
+  adminUserId              String                  @db.Uuid
+  trainingSessionId        String                  @db.Uuid
+  pendingBrochureId        String                  @unique @db.Uuid
+  expectedActiveBrochureId String?                 @db.Uuid
+  secretHash               String                  @unique
+  createdAt                DateTime                @default(now())
+  expiresAt                DateTime
+  consumedAt               DateTime?
+  revokedAt                DateTime?
+  adminUser                AdminUser               @relation(fields: [adminUserId], references: [id], onDelete: Restrict)
+  trainingSession          TrainingSession         @relation(fields: [trainingSessionId], references: [id], onDelete: Restrict)
+  pendingBrochure          TrainingSessionBrochure @relation(fields: [pendingBrochureId], references: [id], onDelete: Restrict)
+
+  @@index([adminUserId, createdAt])
+  @@index([trainingSessionId, expiresAt])
+  @@index([expiresAt, consumedAt])
+}
+
+/// Fixed-window counters shared across instances and independent of login throttling.
+model BrochureUploadAttempt {
+  adminUserId String                    @db.Uuid
+  kind        BrochureUploadAttemptKind
+  windowStart DateTime
+  attempts    Int                       @default(0)
+  adminUser   AdminUser                 @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+
+  @@id([adminUserId, kind, windowStart])
+  @@index([windowStart])
 }
 
 model TrainingSessionExpert {
@@ -344,14 +384,16 @@ model ArticleTranslation {
 }
 
 model AdminUser {
-  id           String         @id @default(uuid()) @db.Uuid
-  email        String         @unique
-  passwordHash String
-  name         String
-  status       AdminStatus    @default(ACTIVE)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  sessions     AdminSession[]
+  id                           String                                       @id @default(uuid()) @db.Uuid
+  email                        String                                       @unique
+  passwordHash                 String
+  name                         String
+  status                       AdminStatus                                  @default(ACTIVE)
+  createdAt                    DateTime                                     @default(now())
+  updatedAt                    DateTime                                     @updatedAt
+  sessions                     AdminSession[]
+  brochureUploadAuthorizations TrainingSessionBrochureUploadAuthorization[]
+  brochureUploadAttempts       BrochureUploadAttempt[]
 }
 
 /// Server-side, individually revocable admin authentication session. The raw token exists only in the

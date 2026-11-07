@@ -163,73 +163,21 @@ export function createTrainingSessionBrochureService(client: PrismaClient) {
 
     async activateValidatedPendingBrochure(sessionId: string, input: ActivateBrochureInput) {
       return client.$transaction(async (tx) => {
-        await loadSession(tx, sessionId);
-        await lockMutableSession(tx, sessionId);
+        return activatePendingInTransaction(tx, sessionId, input);
+      });
+    },
 
-        const activeBrochure = await tx.trainingSessionBrochure.findFirst({
-          where: { trainingSessionId: sessionId, state: TrainingSessionBrochureState.ACTIVE },
-          select: { id: true },
+    async activateAuthorizedPendingBrochure(
+      sessionId: string,
+      pendingBrochureId: string,
+      consume: (tx: TransactionClient) => Promise<string | null>,
+    ) {
+      return client.$transaction(async (tx) => {
+        const expectedActiveBrochureId = await consume(tx);
+        return activatePendingInTransaction(tx, sessionId, {
+          pendingBrochureId,
+          expectedActiveBrochureId,
         });
-        assertExpectedActiveBrochure(activeBrochure?.id ?? null, input.expectedActiveBrochureId);
-
-        const pendingBrochure = await tx.trainingSessionBrochure.findFirst({
-          where: {
-            id: input.pendingBrochureId,
-            trainingSessionId: sessionId,
-            state: TrainingSessionBrochureState.PENDING,
-          },
-          select: { id: true },
-        });
-
-        if (!pendingBrochure) {
-          const existingBrochure = await tx.trainingSessionBrochure.findUnique({
-            where: { id: input.pendingBrochureId },
-            select: { id: true },
-          });
-
-          domainError(
-            existingBrochure ? "BROCHURE_NOT_PENDING" : "BROCHURE_NOT_FOUND",
-            "The brochure is not a pending version for this session.",
-          );
-        }
-
-        const now = new Date();
-
-        if (activeBrochure) {
-          const superseded = await tx.trainingSessionBrochure.updateMany({
-            where: {
-              id: activeBrochure.id,
-              trainingSessionId: sessionId,
-              state: TrainingSessionBrochureState.ACTIVE,
-            },
-            data: { state: TrainingSessionBrochureState.SUPERSEDED, replacedAt: now },
-          });
-
-          if (superseded.count !== 1) {
-            domainError(
-              "STALE_BROCHURE_STATE",
-              "The active brochure changed before this replacement completed.",
-            );
-          }
-        }
-
-        const activated = await tx.trainingSessionBrochure.updateMany({
-          where: {
-            id: pendingBrochure.id,
-            trainingSessionId: sessionId,
-            state: TrainingSessionBrochureState.PENDING,
-          },
-          data: { state: TrainingSessionBrochureState.ACTIVE, activatedAt: now },
-        });
-
-        if (activated.count !== 1) {
-          domainError(
-            "STALE_BROCHURE_STATE",
-            "The pending brochure changed before this activation completed.",
-          );
-        }
-
-        return tx.trainingSessionBrochure.findUniqueOrThrow({ where: { id: pendingBrochure.id } });
       });
     },
 
@@ -283,3 +231,77 @@ export function createTrainingSessionBrochureService(client: PrismaClient) {
 }
 
 export const trainingSessionBrochureService = createTrainingSessionBrochureService(prisma);
+
+async function activatePendingInTransaction(
+  tx: TransactionClient,
+  sessionId: string,
+  input: ActivateBrochureInput,
+) {
+  await loadSession(tx, sessionId);
+  await lockMutableSession(tx, sessionId);
+
+  const activeBrochure = await tx.trainingSessionBrochure.findFirst({
+    where: { trainingSessionId: sessionId, state: TrainingSessionBrochureState.ACTIVE },
+    select: { id: true },
+  });
+  assertExpectedActiveBrochure(activeBrochure?.id ?? null, input.expectedActiveBrochureId);
+
+  const pendingBrochure = await tx.trainingSessionBrochure.findFirst({
+    where: {
+      id: input.pendingBrochureId,
+      trainingSessionId: sessionId,
+      state: TrainingSessionBrochureState.PENDING,
+    },
+    select: { id: true },
+  });
+
+  if (!pendingBrochure) {
+    const existingBrochure = await tx.trainingSessionBrochure.findUnique({
+      where: { id: input.pendingBrochureId },
+      select: { id: true },
+    });
+
+    domainError(
+      existingBrochure ? "BROCHURE_NOT_PENDING" : "BROCHURE_NOT_FOUND",
+      "The brochure is not a pending version for this session.",
+    );
+  }
+
+  const now = new Date();
+
+  if (activeBrochure) {
+    const superseded = await tx.trainingSessionBrochure.updateMany({
+      where: {
+        id: activeBrochure.id,
+        trainingSessionId: sessionId,
+        state: TrainingSessionBrochureState.ACTIVE,
+      },
+      data: { state: TrainingSessionBrochureState.SUPERSEDED, replacedAt: now },
+    });
+
+    if (superseded.count !== 1) {
+      domainError(
+        "STALE_BROCHURE_STATE",
+        "The active brochure changed before this replacement completed.",
+      );
+    }
+  }
+
+  const activated = await tx.trainingSessionBrochure.updateMany({
+    where: {
+      id: pendingBrochure.id,
+      trainingSessionId: sessionId,
+      state: TrainingSessionBrochureState.PENDING,
+    },
+    data: { state: TrainingSessionBrochureState.ACTIVE, activatedAt: now },
+  });
+
+  if (activated.count !== 1) {
+    domainError(
+      "STALE_BROCHURE_STATE",
+      "The pending brochure changed before this activation completed.",
+    );
+  }
+
+  return tx.trainingSessionBrochure.findUniqueOrThrow({ where: { id: pendingBrochure.id } });
+}

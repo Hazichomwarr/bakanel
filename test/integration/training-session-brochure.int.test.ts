@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { TrainingSessionBrochureDomainError } from "@/lib/training-session-brochure.errors";
+import { createBrochureUploadAuthorizationService } from "@/lib/training-session-brochure-authorization.service";
 import { createTrainingSessionBrochureService } from "@/lib/training-session-brochure.service";
 import { createPublicSessionReader } from "@/lib/public/session.read";
 
@@ -80,6 +81,240 @@ afterAll(async () => {
 });
 
 describe("TrainingSession brochure service against PostgreSQL", () => {
+  it("consumes an administrator-bound authorization only with a matching verified object", async () => {
+    const session = await createSession();
+    const admin = await client.adminUser.create({
+      data: {
+        email: `it-${crypto.randomUUID()}@example.test`,
+        name: "it-admin",
+        passwordHash: "it-hash",
+      },
+    });
+    const pending = await service.registerPendingBrochure(session.id, brochureInput("authorized"));
+    const authorizations = createBrochureUploadAuthorizationService(client);
+    const issued = await authorizations.issue({
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      expectedActiveBrochureId: null,
+    });
+    const request = {
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      secret: issued.secret,
+    };
+    const verified = {
+      storageKey: pending.storageKey,
+      mimeType: pending.mimeType,
+      byteSize: pending.byteSize,
+      sha256: pending.sha256,
+      uploadedAt: new Date(),
+      etag: "it-etag",
+    };
+
+    await expect(
+      authorizations.finalize({ ...request, sessionId: crypto.randomUUID() }, verified),
+    ).rejects.toMatchObject({ code: "INVALID_AUTHORIZATION" });
+    await expect(
+      authorizations.finalize(request, { ...verified, sha256: "0".repeat(64) }),
+    ).rejects.toMatchObject({ code: "INVALID_AUTHORIZATION" });
+    await expect(service.getActiveBrochure(session.id)).resolves.toBeNull();
+    await expect(authorizations.finalize(request, verified)).resolves.toMatchObject({
+      id: pending.id,
+      state: "ACTIVE",
+    });
+    await expect(authorizations.finalize(request, verified)).rejects.toMatchObject({
+      code: "INVALID_AUTHORIZATION",
+    });
+    await expect(
+      client.trainingSessionBrochureUploadAuthorization.findUniqueOrThrow({
+        where: { id: issued.id },
+      }),
+    ).resolves.toMatchObject({ consumedAt: expect.any(Date) });
+  });
+
+  it("rejects wrong administrators, sessions, versions, expiration, and replay", async () => {
+    const session = await createSession();
+    const admin = await client.adminUser.create({
+      data: {
+        email: `it-${crypto.randomUUID()}@example.test`,
+        name: "it-admin",
+        passwordHash: "it-hash",
+      },
+    });
+    const other = await client.adminUser.create({
+      data: {
+        email: `it-${crypto.randomUUID()}@example.test`,
+        name: "it-other",
+        passwordHash: "it-hash",
+      },
+    });
+    const pending = await service.registerPendingBrochure(session.id, brochureInput("scope"));
+    const authorizations = createBrochureUploadAuthorizationService(client);
+    const issued = await authorizations.issue({
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      expectedActiveBrochureId: null,
+    });
+    const request = {
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      secret: issued.secret,
+    };
+    await expect(
+      authorizations.validate({ ...request, adminUserId: other.id }),
+    ).rejects.toMatchObject({ code: "INVALID_AUTHORIZATION" });
+    await expect(
+      authorizations.validate({ ...request, sessionId: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ code: "INVALID_AUTHORIZATION" });
+    await expect(
+      authorizations.validate({ ...request, pendingBrochureId: crypto.randomUUID() }),
+    ).rejects.toMatchObject({ code: "INVALID_AUTHORIZATION" });
+    await client.trainingSessionBrochureUploadAuthorization.update({
+      where: { id: issued.id },
+      data: { expiresAt: new Date(0) },
+    });
+    await expect(authorizations.validate(request)).rejects.toMatchObject({
+      code: "INVALID_AUTHORIZATION",
+    });
+    await expect(service.getActiveBrochure(session.id)).resolves.toBeNull();
+  });
+
+  it("serializes concurrent consumption and preserves the losing authorization state", async () => {
+    const session = await createSession();
+    const admin = await client.adminUser.create({
+      data: {
+        email: `it-${crypto.randomUUID()}@example.test`,
+        name: "it-admin",
+        passwordHash: "it-hash",
+      },
+    });
+    const pending = await service.registerPendingBrochure(
+      session.id,
+      brochureInput("concurrent-auth"),
+    );
+    const authorizations = createBrochureUploadAuthorizationService(client);
+    const issued = await authorizations.issue({
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      expectedActiveBrochureId: null,
+    });
+    const request = {
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      secret: issued.secret,
+    };
+    const verified = {
+      storageKey: pending.storageKey,
+      mimeType: pending.mimeType,
+      byteSize: pending.byteSize,
+      sha256: pending.sha256,
+      uploadedAt: new Date(),
+      etag: "it-etag",
+    };
+    const results = await Promise.allSettled([
+      authorizations.finalize(request, verified),
+      authorizations.finalize(request, verified),
+    ]);
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(
+      await client.trainingSessionBrochure.count({
+        where: { trainingSessionId: session.id, state: "ACTIVE" },
+      }),
+    ).toBe(1);
+  });
+
+  it("rolls back authorization consumption when replacement is stale", async () => {
+    const session = await createSession();
+    const admin = await client.adminUser.create({
+      data: {
+        email: `it-${crypto.randomUUID()}@example.test`,
+        name: "it-admin",
+        passwordHash: "it-hash",
+      },
+    });
+    const first = await service.registerPendingBrochure(session.id, brochureInput("stale-first"));
+    const active = await service.activateValidatedPendingBrochure(session.id, {
+      pendingBrochureId: first.id,
+      expectedActiveBrochureId: null,
+    });
+    const pending = await service.registerPendingBrochure(
+      session.id,
+      brochureInput("stale-second"),
+    );
+    const authorizations = createBrochureUploadAuthorizationService(client);
+    const issued = await authorizations.issue({
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      expectedActiveBrochureId: active.id,
+    });
+    await service.removeActiveBrochure(session.id, active.id);
+    const request = {
+      adminUserId: admin.id,
+      sessionId: session.id,
+      pendingBrochureId: pending.id,
+      secret: issued.secret,
+    };
+    const verified = {
+      storageKey: pending.storageKey,
+      mimeType: pending.mimeType,
+      byteSize: pending.byteSize,
+      sha256: pending.sha256,
+      uploadedAt: new Date(),
+      etag: "it-etag",
+    };
+    await expect(authorizations.finalize(request, verified)).rejects.toMatchObject({
+      code: "STALE_BROCHURE_STATE",
+    });
+    const authorization = await client.trainingSessionBrochureUploadAuthorization.findUniqueOrThrow(
+      { where: { id: issued.id } },
+    );
+    expect(authorization.consumedAt).toBeNull();
+    await expect(
+      client.trainingSessionBrochure.findUniqueOrThrow({ where: { id: pending.id } }),
+    ).resolves.toMatchObject({ state: "PENDING" });
+  });
+
+  it("throttles concurrent issuance per administrator in durable PostgreSQL counters", async () => {
+    const session = await createSession();
+    const admin = await client.adminUser.create({
+      data: {
+        email: `it-${crypto.randomUUID()}@example.test`,
+        name: "it-admin",
+        passwordHash: "it-hash",
+      },
+    });
+    const pending = await Promise.all(
+      Array.from({ length: 11 }, (_, index) =>
+        service.registerPendingBrochure(session.id, brochureInput(`limit-${index}`)),
+      ),
+    );
+    const authorizations = createBrochureUploadAuthorizationService(client);
+    const results = await Promise.allSettled(
+      pending.map((version) =>
+        authorizations.issue({
+          adminUserId: admin.id,
+          sessionId: session.id,
+          pendingBrochureId: version.id,
+          expectedActiveBrochureId: null,
+        }),
+      ),
+    );
+    expect(results.filter((result) => result.status === "fulfilled")).toHaveLength(10);
+    expect(results.filter((result) => result.status === "rejected")).toHaveLength(1);
+    expect(
+      await client.trainingSessionBrochureUploadAuthorization.count({
+        where: { adminUserId: admin.id },
+      }),
+    ).toBe(10);
+  });
   it("registers and activates the first validated brochure without exposing the pending record", async () => {
     const session = await createSession();
     const pending = await service.registerPendingBrochure(session.id, brochureInput("first"));
