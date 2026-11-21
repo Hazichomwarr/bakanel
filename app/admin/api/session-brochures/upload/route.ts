@@ -58,9 +58,9 @@ export async function POST(request: Request) {
   }
 
   try {
-    const configuration = await import("@/lib/session-brochure-storage").then((module) =>
-      module.resolveVercelPrivateBlobConfiguration(process.env),
-    );
+    const storageModule = await import("@/lib/session-brochure-storage");
+    const configuration = storageModule.resolveVercelPrivateBlobConfiguration(process.env);
+    const oidcToken = await storageModule.resolveRuntimeOidcToken();
     const result = await handleUploadPresigned({
       request,
       body,
@@ -92,7 +92,7 @@ export async function POST(request: Request) {
         return {
           token: await issueSignedToken({
             storeId: configuration.storeId,
-            oidcToken: configuration.oidcToken,
+            oidcToken,
             pathname,
             operations: ["put"],
             allowedContentTypes: ["application/pdf"],

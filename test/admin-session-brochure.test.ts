@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   handleUploadPresigned: vi.fn(),
   issueSignedToken: vi.fn(),
   storageConfiguration: vi.fn(),
+  runtimeOidcToken: vi.fn(),
   active: vi.fn(),
   remove: vi.fn(),
   revalidate: vi.fn(),
@@ -34,6 +35,7 @@ vi.mock("@/lib/training-session-brochure-authorization.service", () => ({
 }));
 vi.mock("@/lib/session-brochure-storage", () => ({
   resolveVercelPrivateBlobConfiguration: mocks.storageConfiguration,
+  resolveRuntimeOidcToken: mocks.runtimeOidcToken,
 }));
 vi.mock("@vercel/blob/client", () => ({ handleUploadPresigned: mocks.handleUploadPresigned }));
 vi.mock("@vercel/blob", () => ({ issueSignedToken: mocks.issueSignedToken }));
@@ -79,9 +81,9 @@ beforeEach(() => {
   mocks.issue.mockResolvedValue({ secret: "secret", expiresAt: new Date() });
   mocks.storageConfiguration.mockReturnValue({
     storeId: "store_preview_123",
-    oidcToken: "preview-oidc-token",
     webhookPublicKey: "preview-webhook-public-key",
   });
+  mocks.runtimeOidcToken.mockResolvedValue("runtime-oidc-token");
   mocks.issueSignedToken.mockResolvedValue({
     clientSigningToken: "signed-token",
     delegationToken: "delegation-token",
@@ -229,6 +231,7 @@ describe("signed upload callback boundary", () => {
     expect(mocks.issueSignedToken).toHaveBeenCalledWith(
       expect.objectContaining({
         storeId: "store_preview_123",
+        oidcToken: "runtime-oidc-token",
         pathname: storageKey,
         operations: ["put"],
         allowedContentTypes: ["application/pdf"],
@@ -244,6 +247,22 @@ describe("signed upload callback boundary", () => {
 
     expect(response.status).toBe(503);
     expect(mocks.finalizeAuthorizedUpload).not.toHaveBeenCalled();
+  });
+
+  it("does not issue a presigned upload delegation without a runtime OIDC credential", async () => {
+    mocks.runtimeOidcToken.mockRejectedValueOnce(new Error("OIDC credential unavailable"));
+
+    const response = await uploadCallback(
+      new Request(uploadEndpoint, {
+        method: "POST",
+        headers: { origin: "https://example.test", "content-type": "application/json" },
+        body: JSON.stringify({ type: "blob.generate-presigned-url" }),
+      }),
+    );
+
+    expect(response.status).toBe(503);
+    expect(mocks.handleUploadPresigned).not.toHaveBeenCalled();
+    expect(mocks.issueSignedToken).not.toHaveBeenCalled();
   });
 
   it("rejects a callback whose object pathname does not match its pending brochure", async () => {

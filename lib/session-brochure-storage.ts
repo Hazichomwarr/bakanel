@@ -3,6 +3,7 @@ import "server-only";
 import { createHash, randomUUID } from "node:crypto";
 
 import { del, get, head, type GetBlobResult, type HeadBlobResult } from "@vercel/blob";
+import { headers } from "next/headers";
 
 import { MAX_BROCHURE_SIZE_BYTES } from "./session-brochure.constants";
 import { SessionBrochureStorageError } from "./session-brochure-storage.errors";
@@ -57,9 +58,10 @@ export type PrivateBrochureStorage = {
 export type VercelPrivateBlobConfiguration = {
   environment: "production" | "preview";
   storeId: string;
-  oidcToken: string;
   webhookPublicKey: string;
 };
+
+export type RuntimeOidcTokenResolver = () => Promise<string>;
 
 export type VercelBlobApi = {
   head(key: string, options: { oidcToken: string; storeId: string }): Promise<HeadBlobResult>;
@@ -81,7 +83,6 @@ function assertConfiguration(configuration: VercelPrivateBlobConfiguration) {
   if (
     (configuration.environment !== "production" && configuration.environment !== "preview") ||
     !/^[A-Za-z0-9_-]{8,128}$/.test(configuration.storeId) ||
-    !configuration.oidcToken.trim() ||
     !configuration.webhookPublicKey.trim()
   ) {
     storageError(
@@ -229,7 +230,6 @@ export function resolveVercelPrivateBlobConfiguration(
   const deploymentEnvironment = environment.VERCEL_ENV?.trim();
   const configuredEnvironment = environment.SESSION_BROCHURE_BLOB_ENVIRONMENT?.trim();
   const storeId = environment.BLOB_STORE_ID?.trim();
-  const oidcToken = environment.VERCEL_OIDC_TOKEN?.trim();
   const webhookPublicKey = environment.BLOB_WEBHOOK_PUBLIC_KEY?.trim();
 
   if (deploymentEnvironment !== "production" && deploymentEnvironment !== "preview") {
@@ -246,37 +246,56 @@ export function resolveVercelPrivateBlobConfiguration(
     );
   }
 
-  if (!storeId || !/^[A-Za-z0-9_-]{8,128}$/.test(storeId) || !oidcToken || !webhookPublicKey) {
+  if (!storeId || !/^[A-Za-z0-9_-]{8,128}$/.test(storeId) || !webhookPublicKey) {
     storageError(
       "STORAGE_CONFIGURATION_INVALID",
-      "Private brochure storage requires a configured private store, OIDC credential, and webhook verification key.",
+      "Private brochure storage requires a configured private store and webhook verification key.",
     );
   }
 
   return {
     environment: deploymentEnvironment,
     storeId,
-    oidcToken,
     webhookPublicKey,
   };
+}
+
+/**
+ * Vercel supplies this credential in the request context of a Function invocation.
+ * Passing it explicitly to Blob calls prevents a static-token fallback.
+ */
+export async function resolveRuntimeOidcToken() {
+  const token = (await headers()).get("x-vercel-oidc-token")?.trim();
+
+  if (!token) {
+    storageError(
+      "STORAGE_CONFIGURATION_INVALID",
+      "Private brochure storage requires a Vercel runtime OIDC credential.",
+    );
+  }
+
+  return token;
 }
 
 export function createVercelPrivateBrochureStorage(
   configuration: VercelPrivateBlobConfiguration,
   api: VercelBlobApi = vercelBlobApi,
+  getOidcToken: RuntimeOidcTokenResolver = resolveRuntimeOidcToken,
 ): PrivateBrochureStorage {
   assertConfiguration(configuration);
 
-  const options = {
-    storeId: configuration.storeId,
-    oidcToken: configuration.oidcToken,
-  };
+  async function options() {
+    return {
+      storeId: configuration.storeId,
+      oidcToken: await getOidcToken(),
+    };
+  }
 
   async function getMetadata(storageKey: string): Promise<PrivateBrochureObjectMetadata | null> {
     assertStorageKey(storageKey, configuration);
 
     try {
-      const blob = await api.head(storageKey, options);
+      const blob = await api.head(storageKey, await options());
       return toMetadata(storageKey, blob, configuration);
     } catch (error) {
       if (isMissingObjectError(error)) {
@@ -327,7 +346,7 @@ export function createVercelPrivateBrochureStorage(
 
       try {
         result = await api.get(storageKey, {
-          ...options,
+          ...(await options()),
           access: "private",
           useCache: false,
         });
@@ -375,7 +394,7 @@ export function createVercelPrivateBrochureStorage(
 
       try {
         result = await api.get(storageKey, {
-          ...options,
+          ...(await options()),
           access: "private",
           useCache: false,
         });
@@ -445,7 +464,7 @@ export function createVercelPrivateBrochureStorage(
       }
 
       try {
-        await api.del(storageKey, { ...options, ifMatch: etag });
+        await api.del(storageKey, { ...(await options()), ifMatch: etag });
       } catch {
         storageError("STORAGE_PROVIDER_FAILURE", "The private brochure store is unavailable.");
       }

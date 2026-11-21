@@ -3,8 +3,13 @@ import { createHash } from "node:crypto";
 import { BrochureStorageProvider, TrainingSessionBrochureState } from "@prisma/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const oidcHeader = vi.hoisted(() => vi.fn());
+
+vi.mock("next/headers", () => ({ headers: oidcHeader }));
+
 import {
   createVercelPrivateBrochureStorage,
+  resolveRuntimeOidcToken,
   resolveVercelPrivateBlobConfiguration,
   type VercelBlobApi,
 } from "../lib/session-brochure-storage";
@@ -14,7 +19,6 @@ import { createSessionBrochureStorageWorkflow } from "../lib/session-brochure-st
 const configuration = {
   environment: "preview" as const,
   storeId: "store_preview_123",
-  oidcToken: "preview-oidc-token",
   webhookPublicKey: "preview-webhook-public-key",
 };
 
@@ -67,13 +71,16 @@ function expectStorageError(promise: Promise<unknown>, code: SessionBrochureStor
 }
 
 describe("private session brochure storage configuration", () => {
+  beforeEach(() => {
+    oidcHeader.mockResolvedValue(new Headers({ "x-vercel-oidc-token": "runtime-oidc-token" }));
+  });
+
   it("requires an explicit Vercel production or preview environment", () => {
     expect(() =>
       resolveVercelPrivateBlobConfiguration({
         VERCEL_ENV: "development",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "development",
         BLOB_STORE_ID: configuration.storeId,
-        VERCEL_OIDC_TOKEN: configuration.oidcToken,
         BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
       }),
     ).toThrowError("explicit Vercel production or preview environments");
@@ -85,29 +92,19 @@ describe("private session brochure storage configuration", () => {
         VERCEL_ENV: "production",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
         BLOB_STORE_ID: configuration.storeId,
-        VERCEL_OIDC_TOKEN: configuration.oidcToken,
         BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
       }),
     ).toThrowError("exactly match the Vercel deployment environment");
   });
 
-  it("fails closed when the OIDC store, runtime credential, or callback verification key is missing", () => {
+  it("fails closed when the OIDC store or callback verification key is missing", () => {
     expect(() =>
       resolveVercelPrivateBlobConfiguration({
         VERCEL_ENV: "preview",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
         BLOB_STORE_ID: configuration.storeId,
       }),
-    ).toThrowError("configured private store, OIDC credential, and webhook verification key");
-
-    expect(() =>
-      resolveVercelPrivateBlobConfiguration({
-        VERCEL_ENV: "preview",
-        SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
-        BLOB_STORE_ID: configuration.storeId,
-        BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
-      }),
-    ).toThrowError("configured private store, OIDC credential, and webhook verification key");
+    ).toThrowError("configured private store and webhook verification key");
   });
 
   it("uses only Vercel OIDC configuration and ignores legacy static-token settings", () => {
@@ -115,7 +112,6 @@ describe("private session brochure storage configuration", () => {
       VERCEL_ENV: "preview",
       SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
       BLOB_STORE_ID: configuration.storeId,
-      VERCEL_OIDC_TOKEN: configuration.oidcToken,
       BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
       SESSION_BROCHURE_BLOB_TOKEN: "legacy-token-must-not-be-used",
       BLOB_READ_WRITE_TOKEN: "legacy-token-must-not-be-used",
@@ -125,13 +121,29 @@ describe("private session brochure storage configuration", () => {
     expect(JSON.stringify(resolved)).not.toContain("legacy-token-must-not-be-used");
   });
 
+  it("reads the runtime OIDC credential from the Vercel request context", async () => {
+    await expect(resolveRuntimeOidcToken()).resolves.toBe("runtime-oidc-token");
+  });
+
+  it("fails closed when Vercel does not provide a runtime OIDC credential", async () => {
+    oidcHeader.mockResolvedValue(new Headers());
+    process.env.BLOB_READ_WRITE_TOKEN = "legacy-token-must-not-be-used";
+
+    try {
+      await expect(resolveRuntimeOidcToken()).rejects.toMatchObject({
+        code: "STORAGE_CONFIGURATION_INVALID",
+      });
+    } finally {
+      delete process.env.BLOB_READ_WRITE_TOKEN;
+    }
+  });
+
   it("rejects malformed configuration passed directly to the adapter", () => {
     expect(() =>
       createVercelPrivateBrochureStorage(
         {
           environment: "preview",
           storeId: "bad",
-          oidcToken: "preview-oidc-token",
           webhookPublicKey: "key",
         },
         fakeApi(),
@@ -147,7 +159,6 @@ describe("private session brochure storage configuration", () => {
         VERCEL_ENV: "preview",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "production",
         BLOB_STORE_ID: configuration.storeId,
-        VERCEL_OIDC_TOKEN: configuration.oidcToken,
         BLOB_WEBHOOK_PUBLIC_KEY: secret,
       }),
     ).toThrowError(new RegExp(`^(?!.*${secret}).*$`));
@@ -157,6 +168,7 @@ describe("private session brochure storage configuration", () => {
 describe("private session brochure storage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    oidcHeader.mockResolvedValue(new Headers({ "x-vercel-oidc-token": "runtime-oidc-token" }));
   });
 
   it("creates an unpredictable environment-scoped upload key", () => {
@@ -278,7 +290,7 @@ describe("private session brochure storage", () => {
     await storage.deleteObject({ ...input, retentionSatisfied: true });
     expect(api.del).toHaveBeenCalledWith(input.storageKey, {
       storeId: configuration.storeId,
-      oidcToken: configuration.oidcToken,
+      oidcToken: "runtime-oidc-token",
       ifMatch: input.etag,
     });
   });
@@ -291,7 +303,7 @@ describe("private session brochure storage", () => {
 
     expect(api.get).toHaveBeenCalledWith("preview/session-brochures/session/file.pdf", {
       storeId: configuration.storeId,
-      oidcToken: configuration.oidcToken,
+      oidcToken: "runtime-oidc-token",
       access: "private",
       useCache: false,
     });
