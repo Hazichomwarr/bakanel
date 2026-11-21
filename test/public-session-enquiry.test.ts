@@ -35,6 +35,8 @@ const training = {
 
 function session(overrides: Partial<PublicSessionDto>): PublicSessionDto {
   return {
+    id: "123e4567-e89b-12d3-a456-426614174000",
+    hasActiveBrochure: false,
     trainingSlug: training.slug,
     trainingTitle: training.title,
     startDate: new Date("2026-11-12T00:00:00.000Z"),

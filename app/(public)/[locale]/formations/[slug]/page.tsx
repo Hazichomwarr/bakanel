@@ -254,6 +254,14 @@ export default async function TrainingDetailPage({ params }: TrainingDetailPageP
                         }
                       />
                     </dl>
+                    {session.hasActiveBrochure ? (
+                      <a
+                        className="wb-focus wb-text-link mt-8 inline-flex"
+                        href={`/api/public/${locale}/formations/${training.slug}/sessions/${session.id}/brochure`}
+                      >
+                        {detail.brochureDownloadLabel}
+                      </a>
+                    ) : null}
                     {session.registrationOpen ? (
                       <a
                         className="wb-focus wb-text-link mt-8 inline-flex"

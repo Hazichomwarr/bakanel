@@ -85,6 +85,8 @@ describe("public session reader", () => {
 
     await expect(reader.listPublicUpcomingSessions("fr")).resolves.toEqual([
       {
+        id: "internal-session-id",
+        hasActiveBrochure: false,
         trainingSlug: "gestion-risques",
         trainingTitle: "Gestion des risques",
         startDate: new Date("2026-10-09T00:00:00.000Z"),

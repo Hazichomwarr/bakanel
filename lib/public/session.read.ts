@@ -1,6 +1,11 @@
 import "server-only";
 
-import { PricingMode, type PrismaClient, type SessionStatus } from "@prisma/client";
+import {
+  PricingMode,
+  TrainingSessionBrochureState,
+  type PrismaClient,
+  type SessionStatus,
+} from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 
@@ -18,6 +23,7 @@ type SessionListOptions = {
 };
 
 type SelectedSession = {
+  id: string;
   status: SessionStatus;
   startDate: Date;
   endDate: Date;
@@ -30,6 +36,7 @@ type SelectedSession = {
   price: { toString(): string } | null;
   currency: string | null;
   training: { translations: Array<{ slug: string; title: string }> };
+  brochures?: Array<{ id: string }>;
 };
 
 function pageSize(requested?: number) {
@@ -56,6 +63,7 @@ function sessionSelect(locale: PublicLocale) {
   const prismaLocale = toPrismaLocale(locale);
 
   return {
+    id: true,
     status: true,
     startDate: true,
     endDate: true,
@@ -67,6 +75,11 @@ function sessionSelect(locale: PublicLocale) {
     pricingMode: true,
     price: true,
     currency: true,
+    brochures: {
+      where: { state: TrainingSessionBrochureState.ACTIVE },
+      select: { id: true },
+      take: 1,
+    },
     training: {
       select: {
         translations: {
@@ -87,6 +100,8 @@ function toPublicSessionDto(session: SelectedSession, today: Date): PublicSessio
   }
 
   return {
+    id: session.id,
+    hasActiveBrochure: session.brochures?.length === 1,
     trainingSlug: translation.slug,
     trainingTitle: translation.title,
     startDate: session.startDate,

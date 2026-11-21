@@ -51,6 +51,8 @@ export type PublicTrainingAlternateDto = {
 };
 
 export type PublicSessionDto = {
+  id: string;
+  hasActiveBrochure: boolean;
   trainingSlug: string;
   trainingTitle: string;
   startDate: Date;

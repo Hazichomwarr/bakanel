@@ -199,6 +199,8 @@ describe("public session readers against PostgreSQL", () => {
         "currency",
         "deliveryMode",
         "endDate",
+        "hasActiveBrochure",
+        "id",
         "price",
         "pricingMode",
         "registrationDeadline",

@@ -87,6 +87,7 @@ export const en: PublicDictionary = {
     registrationOpen: "Enquiries open",
     registrationClosed: "Enquiries closed",
     sessionEnquiryLabel: "Ask about this session",
+    brochureDownloadLabel: "Download PDF brochure",
     futureSessionsTitle: "Interested in future sessions?",
     futureSessionsDescription: "Contact W'BAKENEL to ask about upcoming training opportunities.",
     futureSessionsCta: "Ask about future sessions",

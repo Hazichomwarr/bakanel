@@ -89,6 +89,7 @@ export const fr: PublicDictionary = {
     registrationOpen: "Renseignements ouverts",
     registrationClosed: "Renseignements clos",
     sessionEnquiryLabel: "Se renseigner sur cette session",
+    brochureDownloadLabel: "Télécharger la brochure PDF",
     futureSessionsTitle: "Vous souhaitez connaître les prochaines sessions ?",
     futureSessionsDescription:
       "Contactez W'BAKENEL pour vous renseigner sur les prochaines dates de formation.",
