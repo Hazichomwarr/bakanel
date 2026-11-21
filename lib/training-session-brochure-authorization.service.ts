@@ -109,6 +109,36 @@ export function createBrochureUploadAuthorizationService(
   }
 
   return {
+    async isCompleted(
+      input: {
+        adminUserId: string;
+        sessionId: string;
+        pendingBrochureId: string;
+        secret: string;
+      },
+      storageKey: string,
+    ) {
+      if (!/^[a-f0-9]{64}$/.test(input.secret)) return false;
+      const authorization = await client.trainingSessionBrochureUploadAuthorization.findUnique({
+        where: { secretHash: hash(input.secret) },
+        select: {
+          adminUserId: true,
+          trainingSessionId: true,
+          pendingBrochureId: true,
+          consumedAt: true,
+          pendingBrochure: { select: { state: true, storageKey: true } },
+        },
+      });
+      return Boolean(
+        authorization &&
+          authorization.adminUserId === input.adminUserId &&
+          authorization.trainingSessionId === input.sessionId &&
+          authorization.pendingBrochureId === input.pendingBrochureId &&
+          authorization.pendingBrochure.storageKey === storageKey &&
+          authorization.consumedAt &&
+          authorization.pendingBrochure.state !== TrainingSessionBrochureState.PENDING,
+      );
+    },
     async issue(input: {
       adminUserId: string;
       sessionId: string;
