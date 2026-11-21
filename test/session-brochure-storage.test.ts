@@ -14,7 +14,8 @@ import { createSessionBrochureStorageWorkflow } from "../lib/session-brochure-st
 const configuration = {
   environment: "preview" as const,
   storeId: "store_preview_123",
-  token: "vercel_blob_secret",
+  oidcToken: "preview-oidc-token",
+  webhookPublicKey: "preview-webhook-public-key",
 };
 
 const validPdf = new TextEncoder().encode("%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF");
@@ -71,8 +72,9 @@ describe("private session brochure storage configuration", () => {
       resolveVercelPrivateBlobConfiguration({
         VERCEL_ENV: "development",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "development",
-        SESSION_BROCHURE_BLOB_STORE_ID: configuration.storeId,
-        SESSION_BROCHURE_BLOB_TOKEN: configuration.token,
+        BLOB_STORE_ID: configuration.storeId,
+        VERCEL_OIDC_TOKEN: configuration.oidcToken,
+        BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
       }),
     ).toThrowError("explicit Vercel production or preview environments");
   });
@@ -82,20 +84,45 @@ describe("private session brochure storage configuration", () => {
       resolveVercelPrivateBlobConfiguration({
         VERCEL_ENV: "production",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
-        SESSION_BROCHURE_BLOB_STORE_ID: configuration.storeId,
-        SESSION_BROCHURE_BLOB_TOKEN: configuration.token,
+        BLOB_STORE_ID: configuration.storeId,
+        VERCEL_OIDC_TOKEN: configuration.oidcToken,
+        BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
       }),
     ).toThrowError("exactly match the Vercel deployment environment");
   });
 
-  it("fails closed when private store credentials are missing", () => {
+  it("fails closed when the OIDC store, runtime credential, or callback verification key is missing", () => {
     expect(() =>
       resolveVercelPrivateBlobConfiguration({
         VERCEL_ENV: "preview",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
-        SESSION_BROCHURE_BLOB_STORE_ID: configuration.storeId,
+        BLOB_STORE_ID: configuration.storeId,
       }),
-    ).toThrowError("configured private store and credential");
+    ).toThrowError("configured private store, OIDC credential, and webhook verification key");
+
+    expect(() =>
+      resolveVercelPrivateBlobConfiguration({
+        VERCEL_ENV: "preview",
+        SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
+        BLOB_STORE_ID: configuration.storeId,
+        BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
+      }),
+    ).toThrowError("configured private store, OIDC credential, and webhook verification key");
+  });
+
+  it("uses only Vercel OIDC configuration and ignores legacy static-token settings", () => {
+    const resolved = resolveVercelPrivateBlobConfiguration({
+      VERCEL_ENV: "preview",
+      SESSION_BROCHURE_BLOB_ENVIRONMENT: "preview",
+      BLOB_STORE_ID: configuration.storeId,
+      VERCEL_OIDC_TOKEN: configuration.oidcToken,
+      BLOB_WEBHOOK_PUBLIC_KEY: configuration.webhookPublicKey,
+      SESSION_BROCHURE_BLOB_TOKEN: "legacy-token-must-not-be-used",
+      BLOB_READ_WRITE_TOKEN: "legacy-token-must-not-be-used",
+    });
+
+    expect(resolved).toEqual(configuration);
+    expect(JSON.stringify(resolved)).not.toContain("legacy-token-must-not-be-used");
   });
 
   it("rejects malformed configuration passed directly to the adapter", () => {
@@ -104,7 +131,8 @@ describe("private session brochure storage configuration", () => {
         {
           environment: "preview",
           storeId: "bad",
-          token: "token",
+          oidcToken: "preview-oidc-token",
+          webhookPublicKey: "key",
         },
         fakeApi(),
       ),
@@ -112,16 +140,17 @@ describe("private session brochure storage configuration", () => {
   });
 
   it("does not include credentials in configuration errors", () => {
-    const secret = "super-secret-blob-token";
+    const secret = "preview-webhook-public-key";
 
     expect(() =>
       resolveVercelPrivateBlobConfiguration({
         VERCEL_ENV: "preview",
         SESSION_BROCHURE_BLOB_ENVIRONMENT: "production",
-        SESSION_BROCHURE_BLOB_STORE_ID: configuration.storeId,
-        SESSION_BROCHURE_BLOB_TOKEN: secret,
+        BLOB_STORE_ID: configuration.storeId,
+        VERCEL_OIDC_TOKEN: configuration.oidcToken,
+        BLOB_WEBHOOK_PUBLIC_KEY: secret,
       }),
-    ).toThrowError(new RegExp("^(?!.*super-secret-blob-token).*$"));
+    ).toThrowError(new RegExp(`^(?!.*${secret}).*$`));
   });
 });
 
@@ -249,8 +278,22 @@ describe("private session brochure storage", () => {
     await storage.deleteObject({ ...input, retentionSatisfied: true });
     expect(api.del).toHaveBeenCalledWith(input.storageKey, {
       storeId: configuration.storeId,
-      token: configuration.token,
+      oidcToken: configuration.oidcToken,
       ifMatch: input.etag,
+    });
+  });
+
+  it("uses store-scoped OIDC options for private reads", async () => {
+    const api = fakeApi();
+    const storage = createVercelPrivateBrochureStorage(configuration, api);
+
+    await storage.getPrivateObject("preview/session-brochures/session/file.pdf");
+
+    expect(api.get).toHaveBeenCalledWith("preview/session-brochures/session/file.pdf", {
+      storeId: configuration.storeId,
+      oidcToken: configuration.oidcToken,
+      access: "private",
+      useCache: false,
     });
   });
 });

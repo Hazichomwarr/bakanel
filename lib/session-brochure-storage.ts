@@ -57,21 +57,22 @@ export type PrivateBrochureStorage = {
 export type VercelPrivateBlobConfiguration = {
   environment: "production" | "preview";
   storeId: string;
-  token: string;
+  oidcToken: string;
+  webhookPublicKey: string;
 };
 
 export type VercelBlobApi = {
-  head(key: string, options: { token: string; storeId: string }): Promise<HeadBlobResult>;
+  head(key: string, options: { oidcToken: string; storeId: string }): Promise<HeadBlobResult>;
   get(
     key: string,
     options: {
       access: "private";
+      oidcToken: string;
       useCache: false;
-      token: string;
       storeId: string;
     },
   ): Promise<GetBlobResult | null>;
-  del(key: string, options: { token: string; storeId: string; ifMatch: string }): Promise<void>;
+  del(key: string, options: { oidcToken: string; storeId: string; ifMatch: string }): Promise<void>;
 };
 
 const vercelBlobApi: VercelBlobApi = { del, get, head };
@@ -80,7 +81,8 @@ function assertConfiguration(configuration: VercelPrivateBlobConfiguration) {
   if (
     (configuration.environment !== "production" && configuration.environment !== "preview") ||
     !/^[A-Za-z0-9_-]{8,128}$/.test(configuration.storeId) ||
-    !configuration.token.trim()
+    !configuration.oidcToken.trim() ||
+    !configuration.webhookPublicKey.trim()
   ) {
     storageError(
       "STORAGE_CONFIGURATION_INVALID",
@@ -226,8 +228,9 @@ export function resolveVercelPrivateBlobConfiguration(
 ): VercelPrivateBlobConfiguration {
   const deploymentEnvironment = environment.VERCEL_ENV?.trim();
   const configuredEnvironment = environment.SESSION_BROCHURE_BLOB_ENVIRONMENT?.trim();
-  const storeId = environment.SESSION_BROCHURE_BLOB_STORE_ID?.trim();
-  const token = environment.SESSION_BROCHURE_BLOB_TOKEN?.trim();
+  const storeId = environment.BLOB_STORE_ID?.trim();
+  const oidcToken = environment.VERCEL_OIDC_TOKEN?.trim();
+  const webhookPublicKey = environment.BLOB_WEBHOOK_PUBLIC_KEY?.trim();
 
   if (deploymentEnvironment !== "production" && deploymentEnvironment !== "preview") {
     storageError(
@@ -243,17 +246,18 @@ export function resolveVercelPrivateBlobConfiguration(
     );
   }
 
-  if (!storeId || !/^[A-Za-z0-9_-]{8,128}$/.test(storeId) || !token) {
+  if (!storeId || !/^[A-Za-z0-9_-]{8,128}$/.test(storeId) || !oidcToken || !webhookPublicKey) {
     storageError(
       "STORAGE_CONFIGURATION_INVALID",
-      "Private brochure storage requires a configured private store and credential.",
+      "Private brochure storage requires a configured private store, OIDC credential, and webhook verification key.",
     );
   }
 
   return {
     environment: deploymentEnvironment,
     storeId,
-    token,
+    oidcToken,
+    webhookPublicKey,
   };
 }
 
@@ -263,7 +267,10 @@ export function createVercelPrivateBrochureStorage(
 ): PrivateBrochureStorage {
   assertConfiguration(configuration);
 
-  const options = { storeId: configuration.storeId, token: configuration.token };
+  const options = {
+    storeId: configuration.storeId,
+    oidcToken: configuration.oidcToken,
+  };
 
   async function getMetadata(storageKey: string): Promise<PrivateBrochureObjectMetadata | null> {
     assertStorageKey(storageKey, configuration);

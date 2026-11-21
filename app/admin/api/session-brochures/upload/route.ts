@@ -1,4 +1,5 @@
-import { handleUpload, type HandleUploadBody } from "@vercel/blob/client";
+import { handleUploadPresigned, type HandleUploadPresignedBody } from "@vercel/blob/client";
+import { issueSignedToken } from "@vercel/blob";
 import { revalidatePath } from "next/cache";
 
 import {
@@ -41,16 +42,16 @@ function parseIdentity(value: string | null): UploadIdentity | null {
 
 export async function POST(request: Request) {
   if (Number(request.headers.get("content-length")) > 16_384) return invalidRequest();
-  let body: HandleUploadBody;
+  let body: HandleUploadPresignedBody;
   try {
-    body = (await request.json()) as HandleUploadBody;
+    body = (await request.json()) as HandleUploadPresignedBody;
   } catch {
     return invalidRequest();
   }
-  if (body?.type !== "blob.generate-client-token" && body?.type !== "blob.upload-completed")
+  if (body?.type !== "blob.generate-presigned-url" && body?.type !== "blob.upload-completed")
     return invalidRequest();
 
-  if (body.type === "blob.generate-client-token") {
+  if (body.type === "blob.generate-presigned-url") {
     const admin = await authenticatedAdmin();
     if (!admin) return forbidden();
     if (!sameOrigin(request)) return invalidRequest();
@@ -60,11 +61,11 @@ export async function POST(request: Request) {
     const configuration = await import("@/lib/session-brochure-storage").then((module) =>
       module.resolveVercelPrivateBlobConfiguration(process.env),
     );
-    const result = await handleUpload({
+    const result = await handleUploadPresigned({
       request,
       body,
-      token: configuration.token,
-      onBeforeGenerateToken: async (pathname, clientPayload) => {
+      webhookPublicKey: configuration.webhookPublicKey,
+      getSignedToken: async (pathname, clientPayload) => {
         const admin = await authenticatedAdmin();
         let submitted: Record<string, unknown>;
         try {
@@ -89,16 +90,27 @@ export async function POST(request: Request) {
         if (pathname !== authorization.pendingBrochure.storageKey)
           throw new Error("Invalid upload pathname");
         return {
-          allowedContentTypes: ["application/pdf"],
-          maximumSizeInBytes: MAX_BROCHURE_SIZE_BYTES,
-          validUntil: authorization.expiresAt.getTime(),
-          addRandomSuffix: false,
-          allowOverwrite: false,
-          tokenPayload: JSON.stringify(identity),
+          token: await issueSignedToken({
+            storeId: configuration.storeId,
+            oidcToken: configuration.oidcToken,
+            pathname,
+            operations: ["put"],
+            allowedContentTypes: ["application/pdf"],
+            maximumSizeInBytes: MAX_BROCHURE_SIZE_BYTES,
+            validUntil: authorization.expiresAt.getTime(),
+          }),
+          urlOptions: {
+            allowedContentTypes: ["application/pdf"],
+            maximumSizeInBytes: MAX_BROCHURE_SIZE_BYTES,
+            validUntil: authorization.expiresAt.getTime(),
+            addRandomSuffix: false,
+            allowOverwrite: false,
+            tokenPayload: JSON.stringify(identity),
+          },
         };
       },
       onUploadCompleted: async ({ blob, tokenPayload }) => {
-        // handleUpload authenticates this event's provider signature before invoking this callback.
+        // handleUploadPresigned authenticates this event's Ed25519 provider signature first.
         const identity = parseIdentity(tokenPayload ?? null);
         if (!identity) throw new Error("Invalid upload callback");
         if (await brochureUploadAuthorizationService.isCompleted(identity, blob.pathname)) return;

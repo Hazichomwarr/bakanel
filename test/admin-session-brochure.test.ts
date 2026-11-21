@@ -8,7 +8,8 @@ const mocks = vi.hoisted(() => ({
   validateAuthorization: vi.fn(),
   isCompleted: vi.fn(),
   finalizeAuthorizedUpload: vi.fn(),
-  handleUpload: vi.fn(),
+  handleUploadPresigned: vi.fn(),
+  issueSignedToken: vi.fn(),
   storageConfiguration: vi.fn(),
   active: vi.fn(),
   remove: vi.fn(),
@@ -34,7 +35,8 @@ vi.mock("@/lib/training-session-brochure-authorization.service", () => ({
 vi.mock("@/lib/session-brochure-storage", () => ({
   resolveVercelPrivateBlobConfiguration: mocks.storageConfiguration,
 }));
-vi.mock("@vercel/blob/client", () => ({ handleUpload: mocks.handleUpload }));
+vi.mock("@vercel/blob/client", () => ({ handleUploadPresigned: mocks.handleUploadPresigned }));
+vi.mock("@vercel/blob", () => ({ issueSignedToken: mocks.issueSignedToken }));
 vi.mock("@/lib/training-session-brochure.service", () => ({
   trainingSessionBrochureService: {
     getActiveBrochure: mocks.active,
@@ -75,10 +77,20 @@ beforeEach(() => {
     pending: { id: brochureId, storageKey },
   });
   mocks.issue.mockResolvedValue({ secret: "secret", expiresAt: new Date() });
-  mocks.storageConfiguration.mockReturnValue({ token: "private-blob-token" });
+  mocks.storageConfiguration.mockReturnValue({
+    storeId: "store_preview_123",
+    oidcToken: "preview-oidc-token",
+    webhookPublicKey: "preview-webhook-public-key",
+  });
+  mocks.issueSignedToken.mockResolvedValue({
+    clientSigningToken: "signed-token",
+    delegationToken: "delegation-token",
+    validUntil: Date.now() + 300_000,
+  });
   mocks.isCompleted.mockResolvedValue(false);
   mocks.validateAuthorization.mockResolvedValue({
     pendingBrochure: { storageKey },
+    expiresAt: new Date(Date.now() + 300_000),
   });
   mocks.finalizeAuthorizedUpload.mockResolvedValue(undefined);
   mocks.active.mockResolvedValue(null);
@@ -182,7 +194,7 @@ describe("signed upload callback boundary", () => {
   }
 
   it("finalizes only the authorization and object bound into the signed callback", async () => {
-    mocks.handleUpload.mockImplementationOnce(async (options) => {
+    mocks.handleUploadPresigned.mockImplementationOnce(async (options) => {
       await options.onUploadCompleted({
         blob: { pathname: storageKey },
         tokenPayload: JSON.stringify(callbackIdentity),
@@ -198,8 +210,44 @@ describe("signed upload callback boundary", () => {
     expect(mocks.finalizeAuthorizedUpload).toHaveBeenCalledWith(callbackIdentity);
   });
 
+  it("uses OIDC-signed upload delegation and the configured webhook verification key", async () => {
+    mocks.handleUploadPresigned.mockImplementationOnce(async (options) => {
+      await options.getSignedToken(storageKey, JSON.stringify(callbackIdentity), false);
+      expect(options.webhookPublicKey).toBe("preview-webhook-public-key");
+      return { type: "blob.generate-presigned-url" };
+    });
+
+    const response = await uploadCallback(
+      new Request(uploadEndpoint, {
+        method: "POST",
+        headers: { origin: "https://example.test", "content-type": "application/json" },
+        body: JSON.stringify({ type: "blob.generate-presigned-url" }),
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(mocks.issueSignedToken).toHaveBeenCalledWith(
+      expect.objectContaining({
+        storeId: "store_preview_123",
+        pathname: storageKey,
+        operations: ["put"],
+        allowedContentTypes: ["application/pdf"],
+        maximumSizeInBytes: 10 * 1024 * 1024,
+      }),
+    );
+  });
+
+  it("does not finalize when the SDK rejects a forged webhook callback", async () => {
+    mocks.handleUploadPresigned.mockRejectedValueOnce(new Error("Invalid callback signature"));
+
+    const response = await uploadCallback(completedEvent());
+
+    expect(response.status).toBe(503);
+    expect(mocks.finalizeAuthorizedUpload).not.toHaveBeenCalled();
+  });
+
   it("rejects a callback whose object pathname does not match its pending brochure", async () => {
-    mocks.handleUpload.mockImplementationOnce(async (options) => {
+    mocks.handleUploadPresigned.mockImplementationOnce(async (options) => {
       await options.onUploadCompleted({
         blob: { pathname: "preview/session-brochures/substituted.pdf" },
         tokenPayload: JSON.stringify(callbackIdentity),
@@ -215,7 +263,7 @@ describe("signed upload callback boundary", () => {
 
   it("accepts a verified replay only after its authorization has completed", async () => {
     mocks.isCompleted.mockResolvedValue(true);
-    mocks.handleUpload.mockImplementationOnce(async (options) => {
+    mocks.handleUploadPresigned.mockImplementationOnce(async (options) => {
       await options.onUploadCompleted({
         blob: { pathname: storageKey },
         tokenPayload: JSON.stringify(callbackIdentity),

@@ -1,6 +1,6 @@
 "use client";
 
-import { upload } from "@vercel/blob/client";
+import { uploadPresigned } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 
@@ -91,7 +91,7 @@ export function BrochurePanel({ sessionId, mutable, active, retained }: Props) {
           }),
         );
       } else
-        await upload(prepared.storageKey, file, {
+        await uploadPresigned(prepared.storageKey, file, {
           access: "private",
           contentType: "application/pdf",
           handleUploadUrl: "/admin/api/session-brochures/upload",
