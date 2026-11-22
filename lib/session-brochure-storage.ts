@@ -265,12 +265,14 @@ export function resolveVercelPrivateBlobConfiguration(
  * Passing it explicitly to Blob calls prevents a static-token fallback.
  */
 export async function resolveRuntimeOidcToken() {
-  const token = (await headers()).get("x-vercel-oidc-token")?.trim();
+  const requestToken = (await headers()).get("x-vercel-oidc-token")?.trim();
+  const runtimeToken = process.env.VERCEL_OIDC_TOKEN?.trim();
+  const token = requestToken || runtimeToken;
 
   if (!token) {
     storageError(
       "STORAGE_CONFIGURATION_INVALID",
-      "Private brochure storage requires a Vercel runtime OIDC credential.",
+      "Private brochure storage requires a Vercel request-context or runtime OIDC credential.",
     );
   }
 

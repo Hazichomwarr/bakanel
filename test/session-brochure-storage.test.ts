@@ -72,6 +72,8 @@ function expectStorageError(promise: Promise<unknown>, code: SessionBrochureStor
 
 describe("private session brochure storage configuration", () => {
   beforeEach(() => {
+    delete process.env.VERCEL_OIDC_TOKEN;
+    delete process.env.BLOB_READ_WRITE_TOKEN;
     oidcHeader.mockResolvedValue(new Headers({ "x-vercel-oidc-token": "runtime-oidc-token" }));
   });
 
@@ -123,6 +125,17 @@ describe("private session brochure storage configuration", () => {
 
   it("reads the runtime OIDC credential from the Vercel request context", async () => {
     await expect(resolveRuntimeOidcToken()).resolves.toBe("runtime-oidc-token");
+  });
+
+  it("uses Vercel's runtime OIDC credential when a provider callback has no request header", async () => {
+    oidcHeader.mockResolvedValue(new Headers());
+    process.env.VERCEL_OIDC_TOKEN = "runtime-callback-oidc-token";
+
+    try {
+      await expect(resolveRuntimeOidcToken()).resolves.toBe("runtime-callback-oidc-token");
+    } finally {
+      delete process.env.VERCEL_OIDC_TOKEN;
+    }
   });
 
   it("fails closed when Vercel does not provide a runtime OIDC credential", async () => {
