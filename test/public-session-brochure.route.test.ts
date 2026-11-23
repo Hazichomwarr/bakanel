@@ -36,23 +36,37 @@ describe("public session brochure download route", () => {
   it("requeries the eligible session, its requested-locale programme slug, and only ACTIVE brochures", async () => {
     const response = await request();
     expect(response.status).toBe(200);
+
+    const query = mocks.findFirst.mock.calls[0][0];
+
     expect(mocks.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           id: sessionId,
           training: expect.objectContaining({
             is: expect.objectContaining({
+              status: "PUBLISHED",
               translations: {
                 some: expect.objectContaining({ slug: "gestion-risques", isPublished: true }),
+              },
+              trainingTopic: {
+                is: expect.objectContaining({
+                  status: "PUBLISHED",
+                  translations: { some: expect.objectContaining({ isPublished: true }) },
+                  trainingDomain: {
+                    is: expect.objectContaining({
+                      status: "PUBLISHED",
+                      translations: { some: expect.objectContaining({ isPublished: true }) },
+                    }),
+                  },
+                }),
               },
             }),
           }),
         }),
       }),
     );
-    expect(mocks.findFirst.mock.calls[0][0].select.brochures.where.state).toBe(
-      TrainingSessionBrochureState.ACTIVE,
-    );
+    expect(query.select.brochures.where.state).toBe(TrainingSessionBrochureState.ACTIVE);
   });
 
   it("streams the current active brochure as a sanitized no-store attachment without leaking its key", async () => {

@@ -74,6 +74,33 @@ export function publicSessionWhere(
   };
 }
 
+/**
+ * The public-session predicate narrowed to one requested-locale training slug. The training
+ * predicate is composed here rather than replaced at individual call sites so public readers
+ * and download routes retain the full published training/topic/domain ancestry requirement.
+ */
+export function publicSessionForTrainingWhere(
+  locale: PublicLocale,
+  slug: string,
+  today: Date,
+): Prisma.TrainingSessionWhereInput {
+  return {
+    ...publicSessionWhere(locale, today),
+    training: {
+      is: {
+        ...publicTrainingWhere(locale),
+        translations: {
+          some: {
+            locale: toPrismaLocale(locale),
+            slug,
+            isPublished: true,
+          },
+        },
+      },
+    },
+  };
+}
+
 export function utcCalendarDate(date: Date) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }

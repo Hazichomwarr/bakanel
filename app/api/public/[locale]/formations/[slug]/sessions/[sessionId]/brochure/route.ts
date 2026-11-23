@@ -2,9 +2,8 @@ import { TrainingSessionBrochureState } from "@prisma/client";
 
 import { brochureStorage } from "@/lib/admin/session-brochure.server";
 import { prisma } from "@/lib/prisma";
-import { publicSessionWhere } from "@/lib/public/eligibility";
+import { publicSessionForTrainingWhere } from "@/lib/public/eligibility";
 import { isPublicLocale } from "@/lib/public/locale";
-import { toPrismaLocale } from "@/lib/public/locale";
 
 export const runtime = "nodejs";
 
@@ -36,10 +35,7 @@ export async function GET(
   const session = await prisma.trainingSession.findFirst({
     where: {
       id: sessionId,
-      ...publicSessionWhere(locale, new Date()),
-      training: {
-        is: { translations: { some: { locale: toPrismaLocale(locale), slug, isPublished: true } } },
-      },
+      ...publicSessionForTrainingWhere(locale, slug, new Date()),
     },
     select: {
       brochures: {

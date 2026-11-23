@@ -10,7 +10,11 @@ import {
 import { prisma } from "@/lib/prisma";
 
 import type { PublicSessionDto } from "./dto";
-import { isRegistrationOpen, publicSessionWhere, publicTrainingWhere } from "./eligibility";
+import {
+  isRegistrationOpen,
+  publicSessionForTrainingWhere,
+  publicSessionWhere,
+} from "./eligibility";
 import type { PublicLocale } from "./locale";
 import { toPrismaLocale } from "./locale";
 
@@ -131,23 +135,9 @@ export function createPublicSessionReader(client: PrismaClient, clock = () => ne
       return [];
     }
 
-    const prismaLocale = toPrismaLocale(locale);
-    const where = publicSessionWhere(locale, today);
-
-    if (normalizedTrainingSlug) {
-      where.training = {
-        is: {
-          ...publicTrainingWhere(locale),
-          translations: {
-            some: {
-              locale: prismaLocale,
-              slug: normalizedTrainingSlug,
-              isPublished: true,
-            },
-          },
-        },
-      };
-    }
+    const where = normalizedTrainingSlug
+      ? publicSessionForTrainingWhere(locale, normalizedTrainingSlug, today)
+      : publicSessionWhere(locale, today);
 
     const sessions = await client.trainingSession.findMany({
       where,
