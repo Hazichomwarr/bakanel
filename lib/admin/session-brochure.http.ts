@@ -31,6 +31,11 @@ export function brochureError(error: unknown) {
       { error: "Cette autorisation a expiré ou a déjà été utilisée." },
       { status: 409 },
     );
+  if (code === "STORAGE_OBJECT_NOT_FOUND")
+    return Response.json(
+      { error: "Le fichier transféré est introuvable pour le moment. Réessayez la finalisation." },
+      { status: 404 },
+    );
   if (
     code === "STORAGE_OBJECT_INVALID" ||
     code === "BROCHURE_VERIFICATION_MISMATCH" ||

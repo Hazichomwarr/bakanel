@@ -2,8 +2,18 @@
 
 import { uploadPresigned } from "@vercel/blob/client";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useRef, useState, useSyncExternalStore } from "react";
 
+import {
+  clearPendingFinalization,
+  isTerminalFinalizationStatus,
+  parsePendingFinalization,
+  readPendingFinalization,
+  readStoredFinalization,
+  savePendingFinalization,
+  subscribePendingFinalization,
+  type PendingBrochureFinalization,
+} from "@/lib/admin/brochure-finalization.client";
 import { MAX_BROCHURE_SIZE_BYTES } from "@/lib/session-brochure.constants";
 
 type ActiveBrochure = { id: string; filename: string; byteSize: number; uploadedAt: string | null };
@@ -20,13 +30,29 @@ function describeError(error: unknown) {
   return "La brochure n’a pas pu être traitée. Réessayez ou actualisez la page.";
 }
 
+function requestError(message: string) {
+  const error = new Error(message);
+  error.name = "BrochureRequestError";
+  return error;
+}
+
+function statusLabel(finalizing: boolean, progress: number | null) {
+  if (finalizing) return "Validation du fichier…";
+  if (progress === null) return "Traitement en cours…";
+  return `Transfert : ${progress} %`;
+}
+
+function browserSessionStorage() {
+  try {
+    return window.sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
 async function responseBody(response: Response) {
   const body = (await response.json()) as { error?: string; active?: ActiveBrochure | null };
-  if (!response.ok) {
-    const error = new Error(body.error ?? "La brochure n’a pas pu être traitée.");
-    error.name = "BrochureRequestError";
-    throw error;
-  }
+  if (!response.ok) throw requestError(body.error ?? "La brochure n’a pas pu être traitée.");
   return body;
 }
 
@@ -35,9 +61,91 @@ export function BrochurePanel({ sessionId, mutable, active, retained }: Props) {
   const input = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
+  const [finalizing, setFinalizing] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const base = `/admin/api/session-brochures/${sessionId}`;
+  // A transferred upload awaiting finalization in this tab; absent during server rendering.
+  const storedFinalization = useSyncExternalStore(
+    subscribePendingFinalization,
+    () => {
+      const storage = browserSessionStorage();
+      return storage ? readStoredFinalization(storage, sessionId) : null;
+    },
+    () => null,
+  );
+  const recovery = parsePendingFinalization(storedFinalization);
+
+  function forgetFinalization() {
+    const storage = browserSessionStorage();
+    if (storage) clearPendingFinalization(storage, sessionId);
+  }
+
+  /**
+   * Asks the server to verify the private object and activate the pending version. Success is
+   * shown only when the server confirms this exact version is ACTIVE.
+   */
+  async function finalize(record: PendingBrochureFinalization) {
+    setFinalizing(true);
+    setProgress(null);
+    let response: Response;
+    try {
+      response = await fetch(`${base}/finalize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pendingBrochureId: record.pendingBrochureId,
+          secret: record.secret,
+        }),
+      });
+    } catch {
+      // The stored record is kept so finalization can be retried.
+      throw requestError(
+        "Le fichier est transféré, mais sa validation n’a pas pu être confirmée. Réessayez la finalisation.",
+      );
+    } finally {
+      setFinalizing(false);
+    }
+
+    const body = (await response.json().catch(() => ({}))) as {
+      error?: string;
+      state?: string;
+      active?: { id?: string } | null;
+    };
+
+    if (response.ok && body.state === "ACTIVE" && body.active?.id === record.pendingBrochureId) {
+      forgetFinalization();
+      return;
+    }
+
+    if (!response.ok && isTerminalFinalizationStatus(response.status)) {
+      forgetFinalization();
+    }
+
+    throw requestError(body.error ?? "La validation de la brochure n’a pas pu être confirmée.");
+  }
+
+  async function resumeFinalization() {
+    setMessage("");
+    setError("");
+    const storage = browserSessionStorage();
+    // Discards an expired record; the server independently rejects expired authorizations.
+    const record = storage ? readPendingFinalization(storage, sessionId, new Date()) : null;
+    if (!record) {
+      setError("Cette autorisation de dépôt a expiré. Déposez à nouveau le fichier.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await finalize(record);
+      setMessage("Brochure PDF enregistrée.");
+      router.refresh();
+    } catch (reason) {
+      setError(describeError(reason));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function handleFile(file: File) {
     setMessage("");
@@ -73,6 +181,7 @@ export function BrochurePanel({ sessionId, mutable, active, retained }: Props) {
         pendingBrochureId: string;
         storageKey: string;
         secret: string;
+        expiresAt: string;
         transport: "fake" | "vercel-blob";
       };
 
@@ -103,20 +212,15 @@ export function BrochurePanel({ sessionId, mutable, active, retained }: Props) {
           onUploadProgress: ({ percentage }) => setProgress(Math.round(percentage)),
         });
 
-      // Provider completion is asynchronous; success means the database reports this version ACTIVE.
-      let activated = false;
-      for (let attempt = 0; attempt < 20; attempt++) {
-        const status = await responseBody(await fetch(base, { cache: "no-store" }));
-        if (status.active?.id === prepared.pendingBrochureId) {
-          activated = true;
-          break;
-        }
-        await new Promise((resolve) => setTimeout(resolve, 500));
-      }
-      if (!activated)
-        throw new Error(
-          "Le transfert est terminé, mais la validation est encore en cours. Actualisez la page dans un instant.",
-        );
+      const record: PendingBrochureFinalization = {
+        pendingBrochureId: prepared.pendingBrochureId,
+        secret: prepared.secret,
+        expiresAt: prepared.expiresAt,
+      };
+      // Kept until the server confirms activation so an interrupted tab can resume finalization.
+      const storage = browserSessionStorage();
+      if (storage) savePendingFinalization(storage, sessionId, record);
+      await finalize(record);
       setMessage("Brochure PDF enregistrée.");
       router.refresh();
     } catch (reason) {
@@ -218,9 +322,21 @@ export function BrochurePanel({ sessionId, mutable, active, retained }: Props) {
           )}
         </div>
       )}
+      {mutable && recovery && !busy && (
+        <div className="mt-6 space-y-2">
+          <p className="text-sm text-[#626862]">Un fichier transféré n’a pas encore été validé.</p>
+          <button
+            type="button"
+            onClick={() => void resumeFinalization()}
+            className="wb-focus min-h-10 border-b border-current text-sm text-[#245b49]"
+          >
+            Finaliser le dépôt
+          </button>
+        </div>
+      )}
       {busy && (
         <p role="status" aria-live="polite" className="mt-4 text-sm">
-          {progress === null ? "Traitement en cours…" : `Transfert : ${progress} %`}
+          {statusLabel(finalizing, progress)}
         </p>
       )}
       {message && (

@@ -6,7 +6,7 @@ import {
   isUuid,
   sameOrigin,
 } from "@/lib/admin/session-brochure.http";
-import { brochureWorkflow, usesFakeBrochureStorage } from "@/lib/admin/session-brochure.server";
+import { usesFakeBrochureStorage } from "@/lib/admin/session-brochure.server";
 import { fakeBrochureStorage } from "@/lib/session-brochure-fake-storage";
 import { brochureUploadAuthorizationService } from "@/lib/training-session-brochure-authorization.service";
 
@@ -37,7 +37,8 @@ export async function POST(request: Request) {
       authorization.pendingBrochure.storageKey,
       Uint8Array.from(atob(body.content), (character) => character.charCodeAt(0)),
     );
-    await brochureWorkflow().finalizeAuthorizedUpload(identity);
+    // Like the presigned transport, this only stores the object; the browser then calls the
+    // authenticated finalization endpoint, which verifies and activates it independently.
     return Response.json({ success: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
     return brochureError(error);
