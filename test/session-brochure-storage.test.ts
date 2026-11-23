@@ -18,14 +18,19 @@ import { createSessionBrochureStorageWorkflow } from "../lib/session-brochure-st
 
 const configuration = {
   environment: "preview" as const,
-  storeId: "store_preview_123",
+  // Vercel store IDs carry a `store_` prefix and mixed case.
+  storeId: "store_AbC123xYz789",
   webhookPublicKey: "preview-webhook-public-key",
 };
 
 const validPdf = new TextEncoder().encode("%PDF-1.7\n1 0 obj\n<< /Type /Catalog >>\nendobj\n%%EOF");
 
+/**
+ * The URL `@vercel/blob@2.8.2` builds for a private pathname: `normalizeStoreId` strips the
+ * lowercase `store_` prefix and the remaining ID is interpolated with its case preserved.
+ */
 function blobUrl() {
-  return `https://${configuration.storeId}.private.blob.vercel-storage.com/preview/session-brochures/file.pdf`;
+  return "https://AbC123xYz789.private.blob.vercel-storage.com/preview/session-brochures/file.pdf";
 }
 
 function streamFor(bytes: Uint8Array) {
@@ -275,6 +280,80 @@ describe("private session brochure storage", () => {
       storage.getMetadata("production/session-brochures/session/file.pdf"),
       "STORAGE_CONFIGURATION_INVALID",
     );
+  });
+
+  describe("private Blob host validation", () => {
+    const storageKey = "preview/session-brochures/file.pdf";
+
+    function storageReturning(url: string) {
+      const api = fakeApi();
+      api.head = vi.fn(async () => ({ ...metadataFor(url) }));
+      return createVercelPrivateBrochureStorage(configuration, api);
+    }
+
+    function metadataFor(url: string) {
+      return {
+        cacheControl: "no-store",
+        contentDisposition: "attachment",
+        contentType: "application/pdf",
+        downloadUrl: url,
+        etag: "etag",
+        pathname: storageKey,
+        size: validPdf.byteLength,
+        uploadedAt: new Date("2026-11-06T12:00:00.000Z"),
+        url,
+      };
+    }
+
+    it("accepts the SDK URL for a mixed-case store ID with the store_ prefix", async () => {
+      await expect(storageReturning(blobUrl()).getMetadata(storageKey)).resolves.toMatchObject({
+        storageKey,
+      });
+    });
+
+    it("accepts the normalized lowercase private hostname", async () => {
+      const url = `https://abc123xyz789.private.blob.vercel-storage.com/${storageKey}`;
+
+      await expect(storageReturning(url).getMetadata(storageKey)).resolves.toMatchObject({
+        storageKey,
+      });
+    });
+
+    it.each([
+      ["a different store", "https://ZzZ999other.private.blob.vercel-storage.com"],
+      [
+        "a store whose ID extends the configured one",
+        "https://AbC123xYz7890.private.blob.vercel-storage.com",
+      ],
+      [
+        "the un-normalized prefixed host",
+        "https://store_AbC123xYz789.private.blob.vercel-storage.com",
+      ],
+      ["the public host of the same store", "https://AbC123xYz789.public.blob.vercel-storage.com"],
+      [
+        "a lookalike parent domain",
+        "https://AbC123xYz789.private.blob.vercel-storage.com.evil.test",
+      ],
+      ["a lookalike prefix", "https://evil-AbC123xYz789.private.blob.vercel-storage.com"],
+      ["a lookalike top-level domain", "https://AbC123xYz789.private.blob.vercel-storage.co"],
+      [
+        "a credential-prefixed host",
+        "https://AbC123xYz789.private.blob.vercel-storage.com@evil.test",
+      ],
+      ["embedded credentials", "https://user:pass@AbC123xYz789.private.blob.vercel-storage.com"],
+      ["a non-default port", "https://AbC123xYz789.private.blob.vercel-storage.com:8443"],
+      ["plain HTTP", "http://AbC123xYz789.private.blob.vercel-storage.com"],
+      ["another scheme", "ftp://AbC123xYz789.private.blob.vercel-storage.com"],
+      ["a malformed URL", "not a url"],
+      ["an empty URL", ""],
+    ])("rejects %s", async (_label, origin) => {
+      const url = origin === "" || origin === "not a url" ? origin : `${origin}/${storageKey}`;
+
+      await expectStorageError(
+        storageReturning(url).getMetadata(storageKey),
+        "STORAGE_PROVIDER_FAILURE",
+      );
+    });
   });
 
   it("maps provider failures to a sanitized storage error", async () => {

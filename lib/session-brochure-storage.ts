@@ -108,8 +108,21 @@ function isMissingObjectError(error: unknown) {
   );
 }
 
+const STORE_ID_PREFIX = "store_";
+const PRIVATE_BLOB_HOST_SUFFIX = ".private.blob.vercel-storage.com";
+
+/**
+ * The exact private host for the configured store. `@vercel/blob` strips a lowercase `store_`
+ * prefix from the store ID (`normalizeStoreId`) and interpolates the rest, case preserved, into
+ * `https://<id>.private.blob.vercel-storage.com`; URL parsing then lowercases the hostname.
+ * The full hostname is compared for equality, so other stores and public hosts never match.
+ */
 function privateBlobHost(storeId: string) {
-  return storeId + ".private.blob.vercel-storage.com";
+  const normalizedStoreId = storeId.startsWith(STORE_ID_PREFIX)
+    ? storeId.slice(STORE_ID_PREFIX.length)
+    : storeId;
+
+  return (normalizedStoreId + PRIVATE_BLOB_HOST_SUFFIX).toLowerCase();
 }
 
 function assertPrivateBlobUrl(url: string, configuration: VercelPrivateBlobConfiguration) {
@@ -124,7 +137,13 @@ function assertPrivateBlobUrl(url: string, configuration: VercelPrivateBlobConfi
     );
   }
 
-  if (parsed.protocol !== "https:" || parsed.hostname !== privateBlobHost(configuration.storeId)) {
+  if (
+    parsed.protocol !== "https:" ||
+    parsed.port !== "" ||
+    parsed.username !== "" ||
+    parsed.password !== "" ||
+    parsed.hostname !== privateBlobHost(configuration.storeId)
+  ) {
     storageError(
       "STORAGE_PROVIDER_FAILURE",
       "The storage provider returned an object from an unexpected store.",
